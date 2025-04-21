@@ -1,22 +1,151 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'PageTurn' } = Astro.props;
+---
+
 <!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro Basics</title>
-	</head>
-	<body>
-		<slot />
-	</body>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="min-h-screen flex flex-col relative">
+      <!-- Background elements -->
+      <div class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div
+          class="absolute -top-40 -right-40 w-80 h-80 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10"
+        >
+        </div>
+        <div
+          class="absolute top-1/3 left-0 w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10"
+        >
+        </div>
+        <div
+          class="absolute -bottom-40 right-1/4 w-80 h-80 bg-indigo-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10"
+        >
+        </div>
+      </div>
+
+      <header
+        class="relative z-10 bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 shadow-lg"
+      >
+        <div class="container mx-auto px-4 py-4">
+          <div class="flex justify-between items-center">
+            <a
+              href="/"
+              class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 text-transparent bg-clip-text"
+              >PageTurn</a
+            >
+            <nav>
+              <ul class="flex space-x-6">
+                <li>
+                  <a href="/" class="hover:text-indigo-400 transition-colors"
+                    >Home</a
+                  >
+                </li>
+                <li>
+                  <a
+                    href="/books"
+                    class="hover:text-indigo-400 transition-colors">Library</a
+                  >
+                </li>
+                <li>
+                  <a
+                    href="/reading-sessions"
+                    class="hover:text-indigo-400 transition-colors"
+                    >Reading Sessions</a
+                  >
+                </li>
+                <li>
+                  <a
+                    href="/stats"
+                    class="hover:text-indigo-400 transition-colors"
+                    >Statistics</a
+                  >
+                </li>
+                <li>
+                  <a
+                    href="/import"
+                    class="hover:text-indigo-400 transition-colors">Import</a
+                  >
+                </li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-grow container mx-auto px-4 py-8 relative z-10">
+        <slot />
+      </main>
+
+      <footer
+        class="relative z-10 bg-slate-900/80 backdrop-blur-sm border-t border-slate-800"
+      >
+        <div class="container mx-auto px-4 py-6">
+          <p class="text-center text-slate-500">
+            © {new Date().getFullYear()} PageTurn
+          </p>
+        </div>
+      </footer>
+    </div>
+  </body>
 </html>
 
 <style>
-	html,
-	body {
-		margin: 0;
-		width: 100%;
-		height: 100%;
-	}
+  html {
+    font-family: 'Inter', sans-serif;
+    scrollbar-color: rgba(99, 102, 241, 0.5) rgba(15, 23, 42, 0.1);
+    scrollbar-width: thin;
+  }
+
+  body {
+    transition: opacity 0.15s ease-in-out;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.1);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.5);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.7);
+  }
 </style>
+
+<script is:inline>
+  // Prevent white flash during page transitions
+  document.addEventListener('astro:before-preparation', () => {
+    document.documentElement.style.scrollBehavior = 'auto';
+    document.body.style.opacity = '0.5';
+  });
+
+  document.addEventListener('astro:page-load', () => {
+    document.body.style.opacity = '1';
+    document.documentElement.style.scrollBehavior = 'smooth';
+  });
+</script>

@@ -1,0 +1,205 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Add New Book | PageTurn">
+  <div>
+    <h1>Add New Book</h1>
+
+    <form id="addBookForm" class="max-w-3xl mt-6 space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label for="title" class="form-label">Title</label>
+          <input
+            type="text"
+            id="title"
+            name="title"
+            required
+            class="form-input"
+          />
+        </div>
+
+        <div>
+          <label for="author" class="form-label">Author</label>
+          <input
+            type="text"
+            id="author"
+            name="author"
+            required
+            class="form-input"
+          />
+        </div>
+
+        <div>
+          <label for="format" class="form-label">Format</label>
+          <select id="format" name="format" required class="form-input">
+            <option value="">Select a format</option>
+            <option value="Hardcover">Hardcover</option>
+            <option value="Paperback">Paperback</option>
+            <option value="E-book">E-book</option>
+            <option value="Audiobook">Audiobook</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="pageCount" class="form-label">Page Count</label>
+          <input
+            type="number"
+            id="pageCount"
+            name="pageCount"
+            required
+            min="1"
+            class="form-input"
+          />
+        </div>
+
+        <div>
+          <label for="isbn" class="form-label">ISBN/ASIN</label>
+          <input type="text" id="isbn" name="isbn" class="form-input" />
+        </div>
+
+        <div>
+          <label for="authorSex" class="form-label">Author Sex</label>
+          <select id="authorSex" name="authorSex" class="form-input">
+            <option value="Unknown">Unknown</option>
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="form-label mb-2">Recommended to me</label>
+          <div class="flex items-center space-x-4">
+            <label class="inline-flex items-center">
+              <input
+                type="radio"
+                name="recommended"
+                value="true"
+                class="form-radio"
+              />
+              <span class="ml-2">Yes</span>
+            </label>
+            <label class="inline-flex items-center">
+              <input
+                type="radio"
+                name="recommended"
+                value="false"
+                class="form-radio"
+                checked
+              />
+              <span class="ml-2">No</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label for="genre" class="form-label">Genre</label>
+          <input
+            type="text"
+            id="genre"
+            name="genre"
+            required
+            class="form-input"
+          />
+        </div>
+
+        <div>
+          <label for="publishedYear" class="form-label">Published Year</label>
+          <input
+            type="number"
+            id="publishedYear"
+            name="publishedYear"
+            class="form-input"
+            min="1500"
+            max={new Date().getFullYear()}
+          />
+        </div>
+
+        <div>
+          <label for="publisher" class="form-label">Publisher</label>
+          <input
+            type="text"
+            id="publisher"
+            name="publisher"
+            class="form-input"
+          />
+        </div>
+
+        <div>
+          <label for="dateAcquired" class="form-label">Date Acquired</label>
+          <input
+            type="date"
+            id="dateAcquired"
+            name="dateAcquired"
+            class="form-input"
+            value={new Date().toISOString().split('T')[0]}
+          />
+        </div>
+
+        <div>
+          <label for="cost" class="form-label">Cost</label>
+          <input
+            type="number"
+            id="cost"
+            name="cost"
+            step="0.01"
+            min="0"
+            class="form-input"
+          />
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-4 pt-4">
+        <a href="/books" class="btn-secondary">Cancel</a>
+        <button type="submit" class="btn">Add Book</button>
+      </div>
+    </form>
+  </div>
+</Layout>
+
+<script>
+  import { addBook } from '../../lib/db';
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('addBookForm') as HTMLFormElement;
+
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+        const book = {
+          title: formData.get('title') as string,
+          author: formData.get('author') as string,
+          format: formData.get('format') as string,
+          pageCount: parseInt(formData.get('pageCount') as string),
+          isbn: formData.get('isbn') as string,
+          authorSex: formData.get('authorSex') as
+            | 'M'
+            | 'F'
+            | 'Other'
+            | 'Unknown',
+          recommended: formData.get('recommended') === 'true',
+          genre: formData.get('genre') as string,
+          publishedYear: parseInt(formData.get('publishedYear') as string),
+          publisher: formData.get('publisher') as string,
+          dateAcquired: formData.get('dateAcquired') as string,
+          dateRemoved: null,
+          cost: parseFloat(formData.get('cost') as string) || 0,
+        };
+
+        try {
+          // Add the book to the database
+          await addBook(book);
+
+          // Redirect to the books list page
+          window.location.href = '/books';
+        } catch (error) {
+          console.error('Error adding book:', error);
+          alert('Failed to add book. Please try again.');
+        }
+      });
+    }
+  });
+</script>

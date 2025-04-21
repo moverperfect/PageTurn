@@ -1,0 +1,189 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getAllBooks, getAllReadingSessions, getBookById } from '../lib/db';
+
+const books = await getAllBooks();
+const sessions = await getAllReadingSessions();
+
+// Calculate overall stats
+const totalBooks = books.length;
+const totalPagesRead = sessions.reduce((sum, session) => sum + session.pagesRead, 0);
+const totalReadingTime = sessions.reduce((sum, session) => sum + session.duration, 0); // in minutes
+const averagePagesPerHour = totalPagesRead / (totalReadingTime / 60) || 0;
+const averageMinutesPerPage = totalReadingTime / totalPagesRead || 0;
+
+// Calculate books finished
+const finishedSessions = sessions.filter(session => session.finished);
+const finishedBookIds = new Set(finishedSessions.map(session => session.bookId));
+const booksFinished = finishedBookIds.size;
+
+// Calculate reading frequency
+const sessionDates = sessions.map(session => new Date(session.date).toISOString().split('T')[0]);
+const uniqueDates = new Set(sessionDates);
+const readingDays = uniqueDates.size;
+
+// Get reading sessions by date (for the chart)
+const sessionsPerDay = Array.from(uniqueDates).map(date => {
+  const sessionsForDate = sessions.filter(session => 
+    new Date(session.date).toISOString().split('T')[0] === date
+  );
+  
+  return {
+    date,
+    pagesRead: sessionsForDate.reduce((sum, session) => sum + session.pagesRead, 0),
+    minutesRead: sessionsForDate.reduce((sum, session) => sum + session.duration, 0)
+  };
+});
+
+// Sort by date
+sessionsPerDay.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+// Last 7 sessions for recent activity
+const recentSessions = await Promise.all(
+  [...sessions]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 7)
+    .map(async session => {
+      const book = await getBookById(session.bookId);
+      return {
+        ...session,
+        bookTitle: book?.title || 'Unknown Book',
+        bookAuthor: book?.author || 'Unknown Author'
+      };
+    })
+);
+---
+
+<Layout title="Reading Statistics | PageTurn">
+  <div class="space-y-8">
+    <h1>Reading Statistics</h1>
+    
+    {sessions.length === 0 ? (
+      <div class="card text-center py-12">
+        <h2>No reading data yet</h2>
+        <p class="mb-6">Start tracking your reading to see your statistics.</p>
+        <a href="/reading-sessions/new" class="btn">Log Your First Session</a>
+      </div>
+    ) : (
+      <>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div class="card">
+            <h3 class="text-gray-500 dark:text-gray-400 text-sm uppercase mb-1">Total Books</h3>
+            <p class="text-3xl font-bold">{totalBooks}</p>
+          </div>
+          
+          <div class="card">
+            <h3 class="text-gray-500 dark:text-gray-400 text-sm uppercase mb-1">Total Pages Read</h3>
+            <p class="text-3xl font-bold">{totalPagesRead}</p>
+          </div>
+          
+          <div class="card">
+            <h3 class="text-gray-500 dark:text-gray-400 text-sm uppercase mb-1">Reading Time</h3>
+            <p class="text-3xl font-bold">{Math.floor(totalReadingTime / 60)} hours {totalReadingTime % 60} min</p>
+          </div>
+          
+          <div class="card">
+            <h3 class="text-gray-500 dark:text-gray-400 text-sm uppercase mb-1">Books Finished</h3>
+            <p class="text-3xl font-bold">{booksFinished}</p>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="card">
+            <h2 class="mb-4">Reading Speed</h2>
+            <div class="space-y-4">
+              <div>
+                <h3 class="text-sm text-gray-500 dark:text-gray-400 mb-1">Pages Per Hour</h3>
+                <div class="flex items-end">
+                  <p class="text-2xl font-bold mr-2">{averagePagesPerHour.toFixed(1)}</p>
+                  <p class="text-gray-500 dark:text-gray-400">pages/hour</p>
+                </div>
+              </div>
+              
+              <div>
+                <h3 class="text-sm text-gray-500 dark:text-gray-400 mb-1">Time Per Page</h3>
+                <div class="flex items-end">
+                  <p class="text-2xl font-bold mr-2">{averageMinutesPerPage.toFixed(1)}</p>
+                  <p class="text-gray-500 dark:text-gray-400">minutes/page</p>
+                </div>
+              </div>
+              
+              <div>
+                <h3 class="text-sm text-gray-500 dark:text-gray-400 mb-1">Reading Frequency</h3>
+                <div class="flex items-end">
+                  <p class="text-2xl font-bold mr-2">{readingDays}</p>
+                  <p class="text-gray-500 dark:text-gray-400">days with reading activity</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="card">
+            <h2 class="mb-4">Recent Activity</h2>
+            {recentSessions.length === 0 ? (
+              <p>No recent reading sessions.</p>
+            ) : (
+              <div class="space-y-4">
+                {recentSessions.map(session => (
+                  <div class="flex items-start pb-4 border-b dark:border-gray-700 last:border-0 last:pb-0">
+                    <div class="flex-1">
+                      <p class="font-medium">{session.bookTitle}</p>
+                      <p class="text-sm text-gray-500 dark:text-gray-400">{session.bookAuthor}</p>
+                      <div class="flex space-x-4 text-sm mt-1">
+                        <p>{session.pagesRead} pages</p>
+                        <p>{session.duration} minutes</p>
+                        <p>{new Date(session.date).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    {session.finished && (
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Finished
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div class="card">
+          <h2 class="mb-4">Reading Progress</h2>
+          <div class="h-64" id="chart-container">
+            <canvas id="reading-chart"></canvas>
+          </div>
+        </div>
+      </>
+    )}
+  </div>
+</Layout>
+
+<script>
+  // Client-side chart rendering
+  document.addEventListener('DOMContentLoaded', () => {
+    const sessions = {
+      dates: [
+        {date: new Date(), pagesRead: 0, minutesRead: 0}
+      ]
+    };
+    
+    try {
+      sessions.dates = JSON.parse(document.getElementById('sessions-data')?.textContent || '[]');
+    } catch (e) {
+      console.error('Error parsing sessions data', e);
+    }
+    
+    if (sessions.dates.length > 0 && typeof window !== 'undefined') {
+      // We would render a chart here if we had a charting library
+      const chartContainer = document.getElementById('chart-container');
+      if (chartContainer) {
+        chartContainer.innerHTML = '<p class="text-center py-10 text-gray-500">Chart would be rendered here.</p>';
+      }
+    }
+  });
+</script>
+
+<!-- Pass data to client script -->
+<script id="sessions-data" type="application/json">
+  {JSON.stringify(sessionsPerDay)}
+</script> 

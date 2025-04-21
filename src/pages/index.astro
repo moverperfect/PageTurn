@@ -1,11 +1,132 @@
 ---
-import Welcome from '../components/Welcome.astro';
 import Layout from '../layouts/Layout.astro';
+import {
+  getCurrentlyReadingBooks,
+  calculateProgress,
+  estimateFinishDate,
+  getAllReadingSessions,
+} from '../lib/db';
 
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+// Get currently reading books
+const currentlyReadingBooks = await getCurrentlyReadingBooks();
+const allSessions = await getAllReadingSessions();
+
+// Calculate statistics for each book
+const booksWithStats = currentlyReadingBooks.map((book) => {
+  const progress = calculateProgress(book, allSessions);
+  const estimatedFinish = estimateFinishDate(book, allSessions);
+
+  return {
+    ...book,
+    ...progress,
+    estimatedFinishDate: estimatedFinish,
+  };
+});
 ---
 
-<Layout>
-	<Welcome />
+<Layout title="Home | PageTurn">
+  <div class="space-y-8">
+    <section>
+      <h1>Welcome to PageTurn</h1>
+      <p class="text-lg mb-4">
+        Track your reading progress, manage your book collection, and analyze
+        your reading habits all in one place.
+      </p>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+        <a href="/books" class="card hover:shadow-lg transition-shadow">
+          <h3>My Library</h3>
+          <p>Manage your book collection</p>
+        </a>
+
+        <a
+          href="/reading-sessions"
+          class="card hover:shadow-lg transition-shadow"
+        >
+          <h3>Reading Sessions</h3>
+          <p>Log your reading progress</p>
+        </a>
+
+        <a href="/stats" class="card hover:shadow-lg transition-shadow">
+          <h3>Statistics</h3>
+          <p>Analyze your reading habits</p>
+        </a>
+      </div>
+    </section>
+
+    <section>
+      <h2>Currently Reading</h2>
+
+      {
+        booksWithStats.length === 0 ? (
+          <p>
+            You're not currently reading any books. Start tracking your reading
+            progress by adding a reading session.
+          </p>
+        ) : (
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+            {booksWithStats.map((book) => (
+              <div class="card">
+                <h3 class="mb-1">{book.title}</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                  by {book.author}
+                </p>
+
+                <div class="mb-3">
+                  <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div
+                      class="bg-blue-600 h-2.5 rounded-full"
+                      style={`width: ${book.percentComplete}%`}
+                    />
+                  </div>
+                  <div class="flex justify-between text-sm mt-1">
+                    <span>
+                      {book.pagesRead} / {book.pageCount} pages
+                    </span>
+                    <span>{book.percentComplete.toFixed(1)}%</span>
+                  </div>
+                </div>
+
+                <div class="text-sm">
+                  <p>
+                    Reading speed: {book.pagesPerHour.toFixed(1)} pages/hour
+                  </p>
+                  <p>
+                    Est. time to finish: {book.estimatedHoursLeft.toFixed(1)}{' '}
+                    hours
+                  </p>
+                  {book.estimatedFinishDate && (
+                    <p>
+                      Est. finish date:{' '}
+                      {book.estimatedFinishDate.toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+
+                <div class="mt-4">
+                  <a
+                    href={`/books/${book.id}`}
+                    class="btn-secondary w-full block text-center"
+                  >
+                    View Details
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      }
+    </section>
+
+    <section>
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="mb-0">Quick Actions</h2>
+      </div>
+
+      <div class="flex flex-wrap gap-4">
+        <a href="/books/new" class="btn">Add New Book</a>
+        <a href="/reading-sessions/new" class="btn">Log Reading Session</a>
+      </div>
+    </section>
+  </div>
 </Layout>

@@ -1,0 +1,224 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getAllBooks } from '../../lib/db';
+
+const books = await getAllBooks();
+---
+
+<Layout title="Log Reading Session | PageTurn">
+  <div>
+    <h1>Log Reading Session</h1>
+
+    {
+      books.length === 0 ? (
+        <div class="card text-center py-12 mt-6">
+          <h2>No books in your library</h2>
+          <p class="mb-6">
+            You need to add books to your library before you can log reading
+            sessions.
+          </p>
+          <a href="/books/new" class="btn">
+            Add Your First Book
+          </a>
+        </div>
+      ) : (
+        <form id="addSessionForm" class="max-w-xl mt-6 space-y-6">
+          <div class="space-y-4">
+            <div>
+              <label for="date" class="form-label">
+                Date
+              </label>
+              <input
+                type="date"
+                id="date"
+                name="date"
+                required
+                class="form-input"
+                value={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+
+            <div>
+              <label for="bookId" class="form-label">
+                Book
+              </label>
+              <select id="bookId" name="bookId" required class="form-input">
+                <option value="">Select a book</option>
+                {books.map((book) => (
+                  <option value={book.id}>
+                    {book.title} by {book.author}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label for="pagesRead" class="form-label">
+                Pages Read
+              </label>
+              <input
+                type="number"
+                id="pagesRead"
+                name="pagesRead"
+                required
+                min="1"
+                class="form-input"
+              />
+            </div>
+
+            <div>
+              <label for="duration" class="form-label">
+                Duration (HH:MM:SS)
+              </label>
+              <input
+                type="text"
+                id="duration"
+                name="duration"
+                required
+                placeholder="00:30:00"
+                class="form-input"
+              />
+            </div>
+
+            <div class="pt-2">
+              <label class="inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="finished"
+                  name="finished"
+                  class="form-checkbox h-5 w-5"
+                />
+                <span class="ml-2">I finished the book</span>
+              </label>
+            </div>
+
+            <div
+              id="stats"
+              class="card bg-blue-50 dark:bg-slate-700 p-4 mt-6 hidden"
+            >
+              <h3 class="text-lg font-medium mb-2">Reading Statistics</h3>
+              <div class="space-y-2">
+                <p>
+                  Pages per hour: <span id="pagesPerHour">-</span>
+                </p>
+                <p>
+                  Minutes per page: <span id="minutesPerPage">-</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-end space-x-4 pt-4">
+            <a href="/reading-sessions" class="btn-secondary">
+              Cancel
+            </a>
+            <button type="submit" class="btn">
+              Save Session
+            </button>
+          </div>
+        </form>
+      )
+    }
+  </div>
+</Layout>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('addSessionForm') as HTMLFormElement;
+    const pagesReadInput = document.getElementById(
+      'pagesRead'
+    ) as HTMLInputElement;
+    const durationInput = document.getElementById(
+      'duration'
+    ) as HTMLInputElement;
+    const statsDiv = document.getElementById('stats');
+    const pagesPerHourSpan = document.getElementById('pagesPerHour');
+    const minutesPerPageSpan = document.getElementById('minutesPerPage');
+
+    // Parse HH:MM:SS to seconds
+    function parseDuration(timeString) {
+      if (!timeString) return 0;
+
+      // Handle different formats
+      const parts = timeString.split(':').map((part) => parseInt(part) || 0);
+
+      if (parts.length === 3) {
+        // HH:MM:SS
+        return parts[0] * 3600 + parts[1] * 60 + parts[2];
+      } else if (parts.length === 2) {
+        // MM:SS
+        return parts[0] * 60 + parts[1];
+      } else if (parts.length === 1) {
+        // SS or a single number (interpret as seconds)
+        return parts[0];
+      }
+
+      return 0;
+    }
+
+    // Calculate and display stats when user inputs data
+    const calculateStats = () => {
+      const pagesRead = parseInt(pagesReadInput.value) || 0;
+      const durationSeconds = parseDuration(durationInput.value) || 0;
+      const durationHours = durationSeconds / 3600;
+
+      if (pagesRead > 0 && durationSeconds > 0) {
+        const pagesPerHour = (pagesRead / durationHours).toFixed(1);
+        const minutesPerPage = (durationSeconds / 60 / pagesRead).toFixed(1);
+
+        if (pagesPerHourSpan) pagesPerHourSpan.textContent = pagesPerHour;
+        if (minutesPerPageSpan) minutesPerPageSpan.textContent = minutesPerPage;
+
+        if (statsDiv) statsDiv.classList.remove('hidden');
+      } else {
+        if (statsDiv) statsDiv.classList.add('hidden');
+      }
+    };
+
+    // Add event listeners for input changes
+    if (pagesReadInput && durationInput) {
+      pagesReadInput.addEventListener('input', calculateStats);
+      durationInput.addEventListener('input', calculateStats);
+    }
+
+    // Handle form submission
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+        const durationStr = formData.get('duration') as string;
+        const durationSeconds = parseDuration(durationStr);
+
+        const session = {
+          date: formData.get('date') as string,
+          bookId: formData.get('bookId') as string,
+          pagesRead: parseInt(formData.get('pagesRead') as string),
+          duration: durationSeconds,
+          finished: formData.get('finished') === 'on',
+        };
+
+        try {
+          // Submit to API endpoint instead of directly using the db function
+          const response = await fetch('/api/reading-sessions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(session),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to add reading session');
+          }
+
+          // Redirect to the reading sessions list page
+          window.location.href = '/reading-sessions';
+        } catch (error) {
+          console.error('Error adding reading session:', error);
+          alert('Failed to add reading session. Please try again.');
+        }
+      });
+    }
+  });
+</script>
