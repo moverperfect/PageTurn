@@ -1,0 +1,515 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Import Data | PageTurn">
+  <div class="max-w-4xl mx-auto">
+    <h1
+      class="bg-gradient-to-r from-indigo-300 to-purple-300 text-transparent bg-clip-text"
+    >
+      Import Data
+    </h1>
+
+    <!-- Tab Navigation -->
+    <div class="mt-6 border-b border-gray-700">
+      <ul class="flex flex-wrap -mb-px">
+        <li class="mr-2">
+          <button id="tab-books" class="tab-btn active py-2 px-4 border-b-2">
+            Books
+          </button>
+        </li>
+        <li class="mr-2">
+          <button
+            id="tab-sessions"
+            class="tab-btn py-2 px-4 border-b-2 border-transparent hover:text-blue-400"
+          >
+            Reading Sessions
+          </button>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Books Import Tab -->
+    <div id="tab-content-books" class="tab-content">
+      <div class="card mt-6 space-y-6">
+        <div>
+          <h2
+            class="bg-gradient-to-r from-blue-300 to-indigo-300 text-transparent bg-clip-text"
+          >
+            Google Sheets Import - Books
+          </h2>
+          <p class="mt-2 text-gray-300">
+            Import your books from a Google Sheet. The sheet must be published
+            to the web and have the following columns:
+          </p>
+
+          <div class="mt-4 overflow-x-auto">
+            <table class="min-w-full">
+              <thead>
+                <tr>
+                  <th>Required Columns</th>
+                  <th>Optional Columns</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <ul class="list-disc list-inside">
+                      <li>title</li>
+                      <li>author</li>
+                      <li>format</li>
+                      <li>pageCount</li>
+                    </ul>
+                  </td>
+                  <td>
+                    <ul class="list-disc list-inside">
+                      <li>isbn</li>
+                      <li>authorSex</li>
+                      <li>recommended</li>
+                      <li>genre</li>
+                      <li>publishedYear</li>
+                      <li>publisher</li>
+                      <li>dateAcquired</li>
+                      <li>cost</li>
+                    </ul>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label for="sheetUrl-books" class="form-label"
+              >Google Sheet URL</label
+            >
+            <input
+              type="text"
+              id="sheetUrl-books"
+              class="form-input"
+              placeholder="https://docs.google.com/spreadsheets/d/SHEET_ID/edit#gid=0"
+            />
+            <p class="mt-1 text-sm text-gray-400">
+              Make sure your sheet is published to the web (File > Share >
+              Publish to web)
+            </p>
+          </div>
+
+          <div>
+            <label for="sheetName-books" class="form-label"
+              >Sheet Name/Tab (optional)</label
+            >
+            <input
+              type="text"
+              id="sheetName-books"
+              class="form-input"
+              placeholder="Sheet1"
+            />
+          </div>
+        </div>
+
+        <div class="pt-4">
+          <button id="importBtn-books" class="btn">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5 mr-2"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z"
+                clip-rule="evenodd"></path>
+            </svg>
+            Import Books
+          </button>
+        </div>
+
+        <div id="importResults-books" class="hidden">
+          <h3 class="text-xl font-semibold text-indigo-300">Import Results</h3>
+          <div id="resultsContent-books" class="mt-2"></div>
+        </div>
+      </div>
+
+      <div class="card mt-6">
+        <h2
+          class="bg-gradient-to-r from-purple-300 to-indigo-300 text-transparent bg-clip-text"
+        >
+          Sample Format - Books
+        </h2>
+        <p class="mt-2 text-gray-300">
+          Your Google Sheet should look like this:
+        </p>
+
+        <div class="mt-4 overflow-x-auto">
+          <table class="min-w-full">
+            <thead>
+              <tr>
+                <th>title</th>
+                <th>author</th>
+                <th>format</th>
+                <th>pageCount</th>
+                <th>isbn</th>
+                <th>genre</th>
+                <th>publishedYear</th>
+                <th>...</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Project Hail Mary</td>
+                <td>Andy Weir</td>
+                <td>Hardcover</td>
+                <td>496</td>
+                <td>9780593135204</td>
+                <td>Science Fiction</td>
+                <td>2021</td>
+                <td>...</td>
+              </tr>
+              <tr>
+                <td>Dune</td>
+                <td>Frank Herbert</td>
+                <td>Paperback</td>
+                <td>658</td>
+                <td>9780441172719</td>
+                <td>Science Fiction</td>
+                <td>1965</td>
+                <td>...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reading Sessions Import Tab -->
+    <div id="tab-content-sessions" class="tab-content hidden">
+      <div class="card mt-6 space-y-6">
+        <div>
+          <h2
+            class="bg-gradient-to-r from-blue-300 to-indigo-300 text-transparent bg-clip-text"
+          >
+            Google Sheets Import - Reading Sessions
+          </h2>
+          <p class="mt-2 text-gray-300">
+            Import your reading sessions from a Google Sheet. The sheet must be
+            published to the web and have the following columns:
+          </p>
+
+          <div class="mt-4 overflow-x-auto">
+            <table class="min-w-full">
+              <thead>
+                <tr>
+                  <th>Required Columns</th>
+                  <th>Optional Columns</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <ul class="list-disc list-inside">
+                      <li>date</li>
+                      <li>duration (HH:MM:SS)</li>
+                      <li>pages read</li>
+                      <li>
+                        Either:
+                        <ul class="list-disc list-inside ml-4">
+                          <li>title and author</li>
+                          <li>OR library book # (book ID)</li>
+                        </ul>
+                      </li>
+                    </ul>
+                  </td>
+                  <td>
+                    <ul class="list-disc list-inside">
+                      <li>finished</li>
+                    </ul>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-2 text-yellow-400">
+            Note: Books must already exist in the system to import reading
+            sessions for them.
+          </p>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label for="sheetUrl-sessions" class="form-label"
+              >Google Sheet URL</label
+            >
+            <input
+              type="text"
+              id="sheetUrl-sessions"
+              class="form-input"
+              placeholder="https://docs.google.com/spreadsheets/d/SHEET_ID/edit#gid=0"
+            />
+            <p class="mt-1 text-sm text-gray-400">
+              Make sure your sheet is published to the web (File > Share >
+              Publish to web)
+            </p>
+          </div>
+
+          <div>
+            <label for="sheetName-sessions" class="form-label"
+              >Sheet Name/Tab (optional)</label
+            >
+            <input
+              type="text"
+              id="sheetName-sessions"
+              class="form-input"
+              placeholder="Sheet1"
+            />
+          </div>
+        </div>
+
+        <div class="pt-4">
+          <button id="importBtn-sessions" class="btn">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5 mr-2"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z"
+                clip-rule="evenodd"></path>
+            </svg>
+            Import Reading Sessions
+          </button>
+        </div>
+
+        <div id="importResults-sessions" class="hidden">
+          <h3 class="text-xl font-semibold text-indigo-300">Import Results</h3>
+          <div id="resultsContent-sessions" class="mt-2"></div>
+        </div>
+      </div>
+
+      <div class="card mt-6">
+        <h2
+          class="bg-gradient-to-r from-purple-300 to-indigo-300 text-transparent bg-clip-text"
+        >
+          Sample Format - Reading Sessions
+        </h2>
+        <p class="mt-2 text-gray-300">
+          Your Google Sheet should look like this:
+        </p>
+
+        <div class="mt-4 overflow-x-auto">
+          <table class="min-w-full">
+            <thead>
+              <tr>
+                <th>date</th>
+                <th>title</th>
+                <th>author</th>
+                <th>pages read</th>
+                <th>duration</th>
+                <th>finished</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>2023-05-15</td>
+                <td>Project Hail Mary</td>
+                <td>Andy Weir</td>
+                <td>45</td>
+                <td>01:30:00</td>
+                <td>false</td>
+              </tr>
+              <tr>
+                <td>2023-05-16</td>
+                <td>Project Hail Mary</td>
+                <td>Andy Weir</td>
+                <td>35</td>
+                <td>00:45:15</td>
+                <td>false</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  interface ImportResponse {
+    success?: boolean;
+    imported?: number;
+    books?: Array<{ title: string; author: string }>;
+    sessions?: Array<{ date: string; pagesRead: number }>;
+    error?: string;
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Tab switching functionality
+    const tabs = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        // Remove active class from all tabs
+        tabs.forEach((t) => t.classList.remove('active'));
+        tabs.forEach((t) => t.classList.add('border-transparent'));
+
+        // Hide all tab contents
+        tabContents.forEach((content) => content.classList.add('hidden'));
+
+        // Add active class to clicked tab
+        tab.classList.add('active');
+        tab.classList.remove('border-transparent');
+
+        // Show corresponding tab content
+        const tabId = tab.id;
+        const contentId = tabId.replace('tab-', 'tab-content-');
+        document.getElementById(contentId)?.classList.remove('hidden');
+      });
+    });
+
+    // Books import functionality
+    setupImport('books');
+
+    // Reading sessions import functionality
+    setupImport('sessions');
+  });
+
+  function setupImport(type: 'books' | 'sessions') {
+    const importBtn = document.getElementById(
+      `importBtn-${type}`
+    ) as HTMLButtonElement;
+    const sheetUrlInput = document.getElementById(
+      `sheetUrl-${type}`
+    ) as HTMLInputElement;
+    const sheetNameInput = document.getElementById(
+      `sheetName-${type}`
+    ) as HTMLInputElement;
+    const importResults = document.getElementById(`importResults-${type}`);
+    const resultsContent = document.getElementById(`resultsContent-${type}`);
+
+    if (importBtn && sheetUrlInput && importResults && resultsContent) {
+      importBtn.addEventListener('click', async () => {
+        const sheetUrl = sheetUrlInput.value.trim();
+        if (!sheetUrl) {
+          alert('Please enter a valid Google Sheet URL');
+          return;
+        }
+
+        // Extract sheet ID from URL
+        let sheetId = '';
+        try {
+          const urlParts = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+          if (urlParts && urlParts[1]) {
+            sheetId = urlParts[1];
+          } else {
+            throw new Error('Invalid sheet URL format');
+          }
+        } catch (error) {
+          alert(
+            "Could not parse Google Sheet URL. Make sure it's in the format: https://docs.google.com/spreadsheets/d/SHEET_ID/..."
+          );
+          return;
+        }
+
+        const sheetName = sheetNameInput?.value.trim() || '';
+
+        // Show loading state
+        importBtn.disabled = true;
+        importBtn.innerHTML = `
+          <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Importing...
+        `;
+
+        try {
+          const response = await fetch('/api/import-sheets', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              sheetId,
+              sheetName,
+              type,
+            }),
+          });
+
+          const result = (await response.json()) as ImportResponse;
+
+          if (!response.ok) {
+            throw new Error(result.error || 'Failed to import data');
+          }
+
+          // Show results
+          importResults.classList.remove('hidden');
+
+          // Display success message
+          if (resultsContent && typeof result.imported === 'number') {
+            if (type === 'books' && Array.isArray(result.books)) {
+              resultsContent.innerHTML = `
+                <div class="bg-green-900/30 border border-green-700 text-green-300 rounded-lg p-4">
+                  <p class="font-medium">Successfully imported ${result.imported} books!</p>
+                </div>
+                <ul class="mt-4 space-y-1 list-disc list-inside text-gray-300">
+                  ${result.books.map((book) => `<li>${book.title} by ${book.author}</li>`).join('')}
+                </ul>
+              `;
+            } else if (type === 'sessions' && Array.isArray(result.sessions)) {
+              resultsContent.innerHTML = `
+                <div class="bg-green-900/30 border border-green-700 text-green-300 rounded-lg p-4">
+                  <p class="font-medium">Successfully imported ${result.imported} reading sessions!</p>
+                </div>
+                <ul class="mt-4 space-y-1 list-disc list-inside text-gray-300">
+                  ${result.sessions
+                    .map((session) => {
+                      const date = new Date(session.date).toLocaleDateString();
+                      return `<li>Session on ${date} - ${session.pagesRead} pages</li>`;
+                    })
+                    .join('')}
+                </ul>
+              `;
+            }
+          }
+        } catch (error) {
+          console.error('Import error:', error);
+
+          // Show error message
+          if (importResults && resultsContent) {
+            importResults.classList.remove('hidden');
+            resultsContent.innerHTML = `
+              <div class="bg-red-900/30 border border-red-700 text-red-300 rounded-lg p-4">
+                <p class="font-medium">Error importing data:</p>
+                <p>${error instanceof Error ? error.message : 'Unknown error'}</p>
+              </div>
+            `;
+          }
+        } finally {
+          // Reset button state
+          importBtn.disabled = false;
+          importBtn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+            </svg>
+            Import ${type === 'books' ? 'Books' : 'Reading Sessions'}
+          `;
+        }
+      });
+    }
+  }
+</script>
+
+<style>
+  .tab-btn.active {
+    border-bottom-color: #6366f1; /* indigo-500 */
+    color: #818cf8; /* indigo-400 */
+  }
+
+  .tab-btn:hover:not(.active) {
+    color: #818cf8; /* indigo-400 */
+  }
+</style>

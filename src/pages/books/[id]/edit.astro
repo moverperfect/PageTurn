@@ -1,0 +1,270 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { getBookById, updateBook } from '../../../lib/db';
+
+// Get the book ID from URL params
+const { id } = Astro.params;
+
+// Fetch the book
+const book = await getBookById(id!);
+
+// Handle case where book is not found
+if (!book) {
+  return Astro.redirect('/books');
+}
+
+const formatOptions = ['Paperback', 'Hardcover', 'E-book', 'Audiobook'];
+const genres = [
+  'Fiction',
+  'Non-fiction',
+  'Science Fiction',
+  'Fantasy',
+  'Mystery',
+  'Thriller',
+  'Romance',
+  'Biography',
+  'History',
+  'Self-help',
+  'Business',
+  'Other',
+];
+---
+
+<Layout title="Edit Book | PageTurn">
+  <div class="max-w-2xl mx-auto">
+    <h1 class="mb-6">Edit Book</h1>
+
+    <form id="editBookForm" class="card space-y-6">
+      <div>
+        <label for="title" class="form-label">Title</label>
+        <input
+          type="text"
+          id="title"
+          name="title"
+          class="form-input"
+          value={book.title}
+          required
+        />
+      </div>
+
+      <div>
+        <label for="author" class="form-label">Author</label>
+        <input
+          type="text"
+          id="author"
+          name="author"
+          class="form-input"
+          value={book.author}
+          required
+        />
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label for="format" class="form-label">Format</label>
+          <select id="format" name="format" class="form-input" required>
+            <option value="">Select a format</option>
+            {
+              formatOptions.map((format) => (
+                <option value={format} selected={format === book.format}>
+                  {format}
+                </option>
+              ))
+            }
+          </select>
+        </div>
+
+        <div>
+          <label for="pageCount" class="form-label">Page Count</label>
+          <input
+            type="number"
+            id="pageCount"
+            name="pageCount"
+            min="1"
+            class="form-input"
+            value={book.pageCount}
+            required
+          />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label for="isbn" class="form-label">ISBN/ASIN</label>
+          <input
+            type="text"
+            id="isbn"
+            name="isbn"
+            class="form-input"
+            value={book.isbn || ''}
+          />
+        </div>
+
+        <div>
+          <label for="authorSex" class="form-label">Author Sex</label>
+          <select id="authorSex" name="authorSex" class="form-input">
+            <option value="Unknown" selected={book.authorSex === 'Unknown'}
+              >Unknown</option
+            >
+            <option value="M" selected={book.authorSex === 'M'}>Male</option>
+            <option value="F" selected={book.authorSex === 'F'}>Female</option>
+            <option value="Other" selected={book.authorSex === 'Other'}
+              >Other</option
+            >
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="form-label mb-2">Recommended to me</label>
+          <div class="flex items-center space-x-4">
+            <label class="inline-flex items-center">
+              <input
+                type="radio"
+                name="recommended"
+                value="true"
+                class="form-radio"
+                checked={book.recommended}
+              />
+              <span class="ml-2">Yes</span>
+            </label>
+            <label class="inline-flex items-center">
+              <input
+                type="radio"
+                name="recommended"
+                value="false"
+                class="form-radio"
+                checked={!book.recommended}
+              />
+              <span class="ml-2">No</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label for="genre" class="form-label">Genre</label>
+          <input
+            type="text"
+            id="genre"
+            name="genre"
+            class="form-input"
+            value={book.genre}
+            required
+          />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label for="publishedYear" class="form-label">Published Year</label>
+          <input
+            type="number"
+            id="publishedYear"
+            name="publishedYear"
+            min="1500"
+            max={new Date().getFullYear()}
+            class="form-input"
+            value={book.publishedYear || ''}
+          />
+        </div>
+
+        <div>
+          <label for="publisher" class="form-label">Publisher</label>
+          <input
+            type="text"
+            id="publisher"
+            name="publisher"
+            class="form-input"
+            value={book.publisher || ''}
+          />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label for="dateAcquired" class="form-label">Date Acquired</label>
+          <input
+            type="date"
+            id="dateAcquired"
+            name="dateAcquired"
+            class="form-input"
+            value={book.dateAcquired
+              ? new Date(book.dateAcquired).toISOString().split('T')[0]
+              : ''}
+          />
+        </div>
+
+        <div>
+          <label for="cost" class="form-label">Cost</label>
+          <input
+            type="number"
+            id="cost"
+            name="cost"
+            step="0.01"
+            min="0"
+            class="form-input"
+            value={book.cost || ''}
+          />
+        </div>
+      </div>
+
+      <div class="flex justify-between">
+        <a href={`/books/${id}`} class="btn-secondary">Cancel</a>
+        <button type="submit" class="btn">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</Layout>
+
+<script define:vars={{ bookId: id }}>
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('editBookForm');
+
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+
+        const updatedBook = {
+          id: bookId,
+          title: formData.get('title'),
+          author: formData.get('author'),
+          format: formData.get('format'),
+          pageCount: parseInt(formData.get('pageCount')),
+          isbn: formData.get('isbn') || '',
+          authorSex: formData.get('authorSex'),
+          recommended: formData.get('recommended') === 'true',
+          genre: formData.get('genre'),
+          publishedYear: formData.get('publishedYear')
+            ? parseInt(formData.get('publishedYear'))
+            : 0,
+          publisher: formData.get('publisher') || '',
+          dateAcquired: formData.get('dateAcquired') || '',
+          dateRemoved: null,
+          cost: formData.get('cost') ? parseFloat(formData.get('cost')) : 0,
+        };
+
+        try {
+          const response = await fetch(`/api/books/${bookId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updatedBook),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to update book');
+          }
+
+          window.location.href = `/books/${bookId}`;
+        } catch (error) {
+          console.error('Error updating book:', error);
+          alert('Failed to update book. Please try again.');
+        }
+      });
+    }
+  });
+</script>

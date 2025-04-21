@@ -1,0 +1,182 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { getAllBooks } from '../../../lib/db';
+import { getReadingSessionById } from '../../../lib/store';
+
+// Get the session ID from URL params
+const { id } = Astro.params;
+
+// Fetch the reading session
+const session = await getReadingSessionById(id!);
+
+// Handle case where session is not found
+if (!session) {
+  return Astro.redirect('/reading-sessions');
+}
+
+// Fetch all books for the dropdown
+const books = await getAllBooks();
+
+// Format seconds to HH:MM:SS
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  return [
+    hours.toString().padStart(2, '0'),
+    minutes.toString().padStart(2, '0'),
+    secs.toString().padStart(2, '0'),
+  ].join(':');
+}
+
+const formattedDuration = formatDuration(session.duration);
+---
+
+<Layout title="Edit Reading Session | PageTurn">
+  <div class="max-w-2xl mx-auto">
+    <h1 class="mb-6">Edit Reading Session</h1>
+
+    <form id="editSessionForm" class="card space-y-6">
+      <div>
+        <label for="book" class="form-label">Book</label>
+        <select id="book" name="book" class="form-input" required>
+          <option value="">Select a book</option>
+          {
+            books.map((book) => (
+              <option value={book.id} selected={book.id === session.bookId}>
+                {book.title} by {book.author}
+              </option>
+            ))
+          }
+        </select>
+      </div>
+
+      <div>
+        <label for="date" class="form-label">Date</label>
+        <input
+          type="date"
+          id="date"
+          name="date"
+          class="form-input"
+          value={new Date(session.date).toISOString().split('T')[0]}
+          required
+        />
+      </div>
+
+      <div>
+        <label for="pagesRead" class="form-label">Pages Read</label>
+        <input
+          type="number"
+          id="pagesRead"
+          name="pagesRead"
+          min="1"
+          class="form-input"
+          value={session.pagesRead}
+          required
+        />
+      </div>
+
+      <div>
+        <label for="duration" class="form-label">Duration (HH:MM:SS)</label>
+        <input
+          type="text"
+          id="duration"
+          name="duration"
+          class="form-input"
+          value={formattedDuration}
+          placeholder="00:30:00"
+          required
+        />
+      </div>
+
+      <div class="flex items-center">
+        <input
+          type="checkbox"
+          id="finished"
+          name="finished"
+          class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          checked={session.finished}
+        />
+        <label
+          for="finished"
+          class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300"
+        >
+          Finished the book
+        </label>
+      </div>
+
+      <div class="flex justify-between">
+        <a href="/reading-sessions" class="btn-secondary">Cancel</a>
+        <button type="submit" class="btn">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</Layout>
+
+<script define:vars={{ sessionId: id, sessionDuration: session.duration }}>
+  // Parse HH:MM:SS to seconds
+  function parseDuration(timeString) {
+    if (!timeString) return 0;
+
+    // Handle different formats
+    const parts = timeString.split(':').map((part) => parseInt(part) || 0);
+
+    if (parts.length === 3) {
+      // HH:MM:SS
+      return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    } else if (parts.length === 2) {
+      // MM:SS
+      return parts[0] * 60 + parts[1];
+    } else if (parts.length === 1) {
+      // SS or a single number (interpret as seconds)
+      return parts[0];
+    }
+
+    return 0;
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('editSessionForm');
+
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+        const durationStr = formData.get('duration');
+
+        // Parse duration from HH:MM:SS to seconds
+        const durationSeconds = parseDuration(durationStr);
+
+        const updatedSession = {
+          id: sessionId,
+          bookId: formData.get('book'),
+          date: new Date(formData.get('date')).toISOString(),
+          pagesRead: parseInt(formData.get('pagesRead')),
+          duration: durationSeconds,
+          finished: formData.get('finished') === 'on',
+        };
+
+        try {
+          const response = await fetch(`/api/reading-sessions/${sessionId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updatedSession),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to update reading session');
+          }
+
+          window.location.href = '/reading-sessions';
+        } catch (error) {
+          console.error('Error updating reading session:', error);
+          alert('Failed to update reading session. Please try again.');
+        }
+      });
+    }
+  });
+</script>

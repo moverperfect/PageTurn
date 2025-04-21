@@ -1,48 +1,31 @@
-# Astro Starter Kit: Basics
+# PageTurn
 
-```sh
-pnpm create astro@latest -- --template basics
-```
+PageTurn is a modern reading tracker application that helps you monitor your reading progress, manage your book collection, and analyze your reading habits.
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/withastro/astro/tree/latest/examples/basics)
-[![Open with CodeSandbox](https://assets.codesandbox.io/github/button-edit-lime.svg)](https://codesandbox.io/p/sandbox/github/withastro/astro/tree/latest/examples/basics)
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/withastro/astro?devcontainer_path=.devcontainer/basics/devcontainer.json)
+## Features
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+- **Book Library Management**: Catalog your books with detailed information
+- **Reading Session Tracking**: Track reading sessions with precise HH:MM:SS duration
+- **Reading Statistics**: Analyze your reading habits with detailed statistics
+- **Progress Tracking**: Monitor your reading progress and estimated completion dates
+- **Data Import**: Import books and reading sessions from Google Sheets
 
-![just-the-basics](https://github.com/withastro/astro/assets/2244813/a0a5533c-a856-4198-8470-2d67b1d7c554)
+## Tech Stack
 
-## 🚀 Project Structure
+- [Astro](https://astro.build) - The web framework for content-driven websites
+- [TailwindCSS](https://tailwindcss.com) - A utility-first CSS framework
+- [Cloudflare Pages](https://pages.cloudflare.com) - For hosting and deployment
 
-Inside of your Astro project, you'll see the following folders and files:
+## Development
 
-```text
-/
-├── public/
-│   └── favicon.svg
-├── src/
-│   ├── layouts/
-│   │   └── Layout.astro
-│   └── pages/
-│       └── index.astro
-└── package.json
-```
+| Command           | Action                                       |
+| :---------------- | :------------------------------------------- |
+| `npm install`     | Installs dependencies                        |
+| `npm run dev`     | Starts local dev server at `localhost:4321`  |
+| `npm run build`   | Build the production site to `./dist/`       |
+| `npm run preview` | Preview your build locally, before deploying |
+| `npm run deploy`  | Deploy to Cloudflare Pages                   |
 
-To learn more about the folder structure of an Astro project, refer to [our guide on project structure](https://docs.astro.build/en/basics/project-structure/).
+## License
 
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `pnpm install`             | Installs dependencies                            |
-| `pnpm dev`             | Starts local dev server at `localhost:4321`      |
-| `pnpm build`           | Build your production site to `./dist/`          |
-| `pnpm preview`         | Preview your build locally, before deploying     |
-| `pnpm astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `pnpm astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+MIT

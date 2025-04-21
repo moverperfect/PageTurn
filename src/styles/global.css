@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+
+@layer base {
+  :root {
+    --glow-primary: #6d28d9;
+    --glow-secondary: #3b82f6;
+    --card-bg: rgba(17, 24, 39, 0.8);
+    --card-border: rgba(99, 102, 241, 0.2);
+  }
+
+  html {
+    @apply bg-gray-900;
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-gradient-to-br from-gray-900 via-slate-900 to-slate-800 text-gray-200;
+    min-height: 100vh;
+    background-attachment: fixed;
+  }
+
+  /* Glassmorphism Cards */
+  .card {
+    @apply rounded-xl p-6 shadow-lg backdrop-blur-lg;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center px-4 py-2 rounded-lg font-medium transition-all duration-200 
+    bg-gradient-to-r from-indigo-600 to-indigo-500 text-white hover:from-indigo-500 hover:to-indigo-700 
+    shadow-md hover:shadow-indigo-500/20 focus:ring-2 focus:ring-indigo-500/50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center px-4 py-2 rounded-lg font-medium transition-all duration-200 
+    border border-slate-600 bg-transparent text-slate-300 hover:bg-slate-800 
+    hover:text-white hover:border-slate-500 shadow-md focus:ring-2 focus:ring-slate-500/50;
+  }
+
+  /* Form inputs */
+  .form-label {
+    @apply block mb-2 text-sm font-medium text-gray-300;
+  }
+
+  .form-input {
+    @apply bg-slate-800 border border-slate-700 text-gray-200 text-sm rounded-lg 
+    focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 
+    placeholder-gray-400;
+  }
+
+  /* Checkbox and radio */
+  [type='checkbox'],
+  [type='radio'] {
+    @apply text-indigo-600 border-slate-600 rounded focus:ring-indigo-500;
+  }
+
+  /* Headings */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-bold text-white;
+  }
+
+  h1 {
+    @apply text-3xl mb-6;
+  }
+  h2 {
+    @apply text-2xl mb-4;
+  }
+  h3 {
+    @apply text-xl mb-3;
+  }
+
+  /* Links */
+  a:not(.btn):not(.btn-secondary) {
+    @apply text-indigo-400 hover:text-indigo-300 transition-colors duration-200;
+  }
+
+  /* Tables */
+  table {
+    @apply w-full text-sm text-left text-gray-300;
+  }
+
+  thead {
+    @apply text-xs uppercase bg-slate-800 text-gray-400;
+  }
+
+  th,
+  td {
+    @apply px-6 py-3;
+  }
+
+  tbody tr {
+    @apply border-b border-slate-700 hover:bg-slate-800/50;
+  }
+}
