@@ -1,14 +1,21 @@
 {
-  "name": "books-library",
-  "type": "module",
-  "version": "0.0.1",
-  "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
-    "astro": "astro"
-  },
-  "dependencies": {
-    "astro": "^5.7.4"
-  }
+	"name": "books-library",
+	"type": "module",
+	"version": "0.0.1",
+	"scripts": {
+		"dev": "astro dev",
+		"build": "astro build",
+		"preview": "astro build && wrangler pages dev",
+		"astro": "astro",
+		"deploy": "astro build && wrangler pages deploy",
+		"cf-typegen": "wrangler types"
+	},
+	"dependencies": {
+		"@astrojs/cloudflare": "^12.5.0",
+		"astro": "^5.7.4"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20250421.0",
+		"wrangler": "^4.12.0"
+	}
 }
