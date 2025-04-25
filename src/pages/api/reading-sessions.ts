@@ -1,9 +1,9 @@
 import type { APIRoute } from 'astro';
-import type { ReadingSession } from '../../lib/db';
-import { getAllReadingSessions, addReadingSession } from '../../lib/store';
+import type { ReadingSession } from '../../lib/schema';
+import { getAllReadingSessions, addReadingSession } from '../../lib/db';
 
-export const GET: APIRoute = async ({ params, request }) => {
-  const sessions = getAllReadingSessions();
+export const GET: APIRoute = async ({ locals }) => {
+  const sessions = await getAllReadingSessions(locals.runtime.env);
 
   return new Response(
     JSON.stringify(sessions),
@@ -16,10 +16,10 @@ export const GET: APIRoute = async ({ params, request }) => {
   );
 };
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   try {
     const sessionData = await request.json() as Omit<ReadingSession, 'id'>;
-    const newSession = addReadingSession(sessionData);
+    const newSession = await addReadingSession(sessionData, locals.runtime.env);
 
     return new Response(
       JSON.stringify(newSession),

@@ -2,8 +2,8 @@
 import Layout from '../layouts/Layout.astro';
 import { getAllBooks, getAllReadingSessions, getBookById } from '../lib/db';
 
-const books = await getAllBooks();
-const sessions = await getAllReadingSessions();
+const books = await getAllBooks(Astro.locals.runtime.env);
+const sessions = await getAllReadingSessions(Astro.locals.runtime.env);
 
 // Calculate overall stats
 const totalBooks = books.length;
@@ -44,7 +44,7 @@ const recentSessions = await Promise.all(
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 7)
     .map(async session => {
-      const book = await getBookById(session.bookId);
+      const book = await getBookById(session.bookId, Astro.locals.runtime.env);
       return {
         ...session,
         bookTitle: book?.title || 'Unknown Book',
@@ -79,7 +79,7 @@ const recentSessions = await Promise.all(
           
           <div class="card">
             <h3 class="text-gray-500 dark:text-gray-400 text-sm uppercase mb-1">Reading Time</h3>
-            <p class="text-3xl font-bold">{Math.floor(totalReadingTime / 60)} hours {totalReadingTime % 60} min</p>
+            <p class="text-3xl font-bold">{Math.floor(totalReadingTime / 3600)} hours {Math.floor((totalReadingTime % 3600) / 60)} min</p>
           </div>
           
           <div class="card">
@@ -184,6 +184,6 @@ const recentSessions = await Promise.all(
 </script>
 
 <!-- Pass data to client script -->
-<script id="sessions-data" type="application/json">
+<script is:inline id="sessions-data" type="application/json">
   {JSON.stringify(sessionsPerDay)}
 </script> 

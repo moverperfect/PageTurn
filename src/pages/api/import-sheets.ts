@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
-import type { Book, ReadingSession } from '../../lib/db';
-import { addBook, addReadingSession, getBookByTitleAndAuthor } from '../../lib/store';
+import { addBook, addReadingSession, getBookByTitleAndAuthor } from '../../lib/db';
+import type { ReadingSession, Book } from '../../lib/schema';
 
 interface ImportRequestBody {
   sheetId: string;
@@ -47,9 +47,16 @@ async function fetchSheetData(sheetId: string, sheetName: string = 'Sheet1'): Pr
   }
 }
 
-// Helper function to parse CSV
+/**
+ * Parses CSV text into a two-dimensional array of strings.
+ *
+ * Handles quoted fields, embedded commas, escaped quotes, and normalizes line endings.
+ *
+ * @param text - The CSV-formatted string to parse.
+ * @returns An array of rows, each row being an array of field values.
+ */
 function parseCSV(text: string): string[][] {
-  const lines = text.split('\n');
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
 
   return lines.map(line => {
     // Handle quoted fields with commas
@@ -60,8 +67,11 @@ function parseCSV(text: string): string[][] {
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
 
-      if (char === '"') {
+      if (char === '"' && line[i + 1] !== '"') {
         inQuotes = !inQuotes;
+      } else if (char === '"' && line[i + 1] === '"') {
+        currentField += '"';
+        i++;
       } else if (char === ',' && !inQuotes) {
         result.push(currentField);
         currentField = '';
@@ -127,7 +137,14 @@ function parseDuration(durationStr: string): number {
   return parseFloat(durationStr) || 0;
 }
 
-// Parse date in various formats including dd/mm/yyyy
+/**
+ * Parses a date string in various formats and returns an ISO 8601 string.
+ *
+ * Supports `dd/mm/yyyy` format by converting it to ISO format. Falls back to standard JavaScript date parsing for other formats. If parsing fails or the input is empty, returns the current date in ISO format.
+ *
+ * @param dateStr - The date string to parse.
+ * @returns The parsed date as an ISO 8601 string.
+ */
 function parseDate(dateStr: string): string {
   if (!dateStr) return new Date().toISOString();
 
@@ -154,9 +171,19 @@ function parseDate(dateStr: string): string {
   }
 }
 
-// Convert sheet data to ReadingSession objects
-function convertToReadingSessions(sheetData: any[]): Omit<ReadingSession, 'id'>[] {
-  return sheetData.map(row => {
+/**
+ * Converts raw sheet data into an array of reading session objects, resolving book references asynchronously.
+ *
+ * Each row must include a date and either a title with author or a library book number. If a title and author are provided, the corresponding book is looked up in the database; otherwise, the library book number is used as the book ID. Parses and normalizes fields such as pages read, duration (in seconds), date, and finished status.
+ *
+ * @param sheetData - Array of objects representing rows from the sheet.
+ * @param env - Environment context used for database lookups.
+ * @returns A promise that resolves to an array of reading session objects without IDs.
+ *
+ * @throws {Error} If required fields are missing or if a referenced book cannot be found.
+ */
+async function convertToReadingSessions(sheetData: any[], env: Env): Promise<Omit<ReadingSession, 'id'>[]> {
+  const sessionPromises = sheetData.map(async row => {
     // We need date and either (title + author) or (library book #)
     if (!row.date || ((!row.title || !row.author) && !row['library book #'])) {
       throw new Error(`Missing required fields in row: ${JSON.stringify(row)}`);
@@ -165,7 +192,7 @@ function convertToReadingSessions(sheetData: any[]): Omit<ReadingSession, 'id'>[
     // Find the book by title and author
     let bookId: string;
     if (row.title && row.author) {
-      const book = getBookByTitleAndAuthor(row.title, row.author);
+      const book = await getBookByTitleAndAuthor(row.title, row.author, env);
       if (!book) {
         throw new Error(`Book not found: ${row.title} by ${row.author}`);
       }
@@ -198,9 +225,11 @@ function convertToReadingSessions(sheetData: any[]): Omit<ReadingSession, 'id'>[
 
     return session;
   });
+
+  return Promise.all(sessionPromises);
 }
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   try {
     const requestData = await request.json() as ImportRequestBody;
     const { sheetId, sheetName = 'Sheet1', type = 'books' } = requestData;
@@ -220,11 +249,11 @@ export const POST: APIRoute = async ({ request }) => {
       const books = convertToBooks(sheetData);
 
       // Add books to the database
-      const addedBooks = [];
-      for (const bookData of books) {
-        const book = addBook(bookData);
-        addedBooks.push(book);
-      }
+      // Create an array of promises for adding books
+      const bookPromises = books.map(bookData => addBook(bookData, locals.runtime.env));
+
+      // Wait for all books to be added
+      const addedBooks = await Promise.all(bookPromises);
 
       return new Response(
         JSON.stringify({
@@ -236,14 +265,14 @@ export const POST: APIRoute = async ({ request }) => {
       );
     } else if (type === 'sessions') {
       // Convert to ReadingSession objects
-      const sessions = convertToReadingSessions(sheetData);
+      const sessions = await convertToReadingSessions(sheetData, locals.runtime.env);
 
       // Add sessions to the database
-      const addedSessions = [];
-      for (const sessionData of sessions) {
-        const session = addReadingSession(sessionData);
-        addedSessions.push(session);
-      }
+      // Create an array of promises for adding sessions
+      const sessionPromises = sessions.map(sessionData => addReadingSession(sessionData, locals.runtime.env));
+
+      // Wait for all sessions to be added
+      const addedSessions = await Promise.all(sessionPromises);
 
       return new Response(
         JSON.stringify({
@@ -266,4 +295,5 @@ export const POST: APIRoute = async ({ request }) => {
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
-}; 
+};
+

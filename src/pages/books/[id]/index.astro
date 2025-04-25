@@ -10,7 +10,7 @@ import {
 const { id } = Astro.params;
 
 // Fetch the book data
-const book = await getBookById(id!);
+const book = await getBookById(id!, Astro.locals.runtime.env);
 
 // Handle case where book is not found
 if (!book) {
@@ -18,7 +18,10 @@ if (!book) {
 }
 
 // Get reading sessions for this book
-const readingSessions = await getReadingSessionsForBook(id!);
+const readingSessions = await getReadingSessionsForBook(
+  id!,
+  Astro.locals.runtime.env
+);
 
 // Calculate progress
 const progress = calculateProgress(book, readingSessions);

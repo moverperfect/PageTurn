@@ -1,10 +1,9 @@
 import type { APIRoute } from 'astro';
-import type { Book } from '../../lib/db';
-import { getAllBooks, addBook } from '../../lib/store';
+import type { Book } from '../../lib/schema';
+import { getAllBooks, addBook } from '../../lib/db';
 
-
-export const GET: APIRoute = async ({ params, request }) => {
-  const allBooks = getAllBooks();
+export const GET: APIRoute = async ({ locals }) => {
+  const allBooks = await getAllBooks(locals.runtime.env);
 
   return new Response(
     JSON.stringify(allBooks),
@@ -17,10 +16,10 @@ export const GET: APIRoute = async ({ params, request }) => {
   );
 };
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   try {
     const bookData = await request.json() as Omit<Book, 'id'>;
-    const newBook = addBook(bookData);
+    const newBook = await addBook(bookData, locals.runtime.env);
 
     return new Response(
       JSON.stringify(newBook),

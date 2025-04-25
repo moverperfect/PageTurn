@@ -1,33 +1,18 @@
 // Types for our book and reading session data
-import * as store from './store';
+import { eq, and, ilike, sql } from 'drizzle-orm';
+import { getDbClient } from './db-client';
+import { books, readingSessions, type Book, type ReadingSession } from './schema';
+import { v4 as uuidv4 } from 'uuid';
 
-export interface Book {
-  id: string;
-  title: string;
-  author: string;
-  format: string;
-  pageCount: number;
-  isbn: string;
-  authorSex: 'M' | 'F' | 'Other' | 'Unknown';
-  recommended: boolean;
-  genre: string;
-  publishedYear: number;
-  publisher: string;
-  dateAcquired: string;
-  dateRemoved: string | null;
-  cost: number;
-}
-
-export interface ReadingSession {
-  id: string;
-  date: string;
-  bookId: string;
-  pagesRead: number;
-  duration: number; // in seconds
-  finished: boolean;
-}
-
-// Helper functions to calculate statistics
+/**
+ * Calculates reading progress statistics for a book based on its reading sessions.
+ *
+ * Returns an object containing the total pages read, percent complete, average minutes per page, pages per hour, and estimated hours left to finish the book.
+ *
+ * @param book - The book for which to calculate progress.
+ * @param sessions - All reading sessions, including those for other books.
+ * @returns An object with progress metrics: {@link pagesRead}, {@link percentComplete}, {@link minutesPerPage}, {@link pagesPerHour}, and {@link estimatedHoursLeft}.
+ */
 export function calculateProgress(book: Book, sessions: ReadingSession[]): {
   pagesRead: number;
   percentComplete: number;
@@ -41,8 +26,8 @@ export function calculateProgress(book: Book, sessions: ReadingSession[]): {
 
   const totalDurationSeconds = bookSessions.reduce((sum, session) => sum + session.duration, 0);
   const totalDurationMinutes = totalDurationSeconds / 60;
-  const minutesPerPage = totalDurationMinutes / pagesRead || 0;
-  const pagesPerHour = pagesRead / (totalDurationMinutes / 60) || 0;
+  const minutesPerPage = pagesRead === 0 ? 0 : totalDurationMinutes / pagesRead;
+  const pagesPerHour = totalDurationMinutes === 0 ? 0 : pagesRead / (totalDurationMinutes / 60);
 
   const pagesLeft = book.pageCount - pagesRead;
   const estimatedHoursLeft = (pagesLeft * minutesPerPage) / 60;
@@ -56,6 +41,15 @@ export function calculateProgress(book: Book, sessions: ReadingSession[]): {
   };
 }
 
+/**
+ * Estimates the finish date for a book based on past reading sessions.
+ *
+ * Calculates the average interval between sessions and average pages read per session to project when the book will be completed. Returns null if there are no sessions for the book.
+ *
+ * @param book - The book for which to estimate the finish date.
+ * @param sessions - All reading sessions, including those for other books.
+ * @returns A Date representing the estimated finish date, or null if no sessions exist for the book.
+ */
 export function estimateFinishDate(book: Book, sessions: ReadingSession[]): Date | null {
   const bookSessions = sessions.filter(session => session.bookId === book.id);
   if (bookSessions.length === 0) return null;
@@ -91,122 +85,284 @@ export function estimateFinishDate(book: Book, sessions: ReadingSession[]): Date
   return finishDate;
 }
 
-// Determine if we're in a browser or server context
-const isBrowser = typeof window !== 'undefined';
+/**
+ * Retrieves all books from the database.
+ *
+ * @returns A promise that resolves to an array of all books.
+ */
+export async function getAllBooks(env: Env): Promise<Book[]> {
+  const db = getDbClient(env);
+  return await db.select().from(books);
+}
 
-// Helper function to make API requests (only used in browser context)
-async function apiRequest<T>(
-  endpoint: string,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
-  data?: any
-): Promise<T> {
-  const options: RequestInit = {
-    method,
-    headers: {
-      'Content-Type': 'application/json'
-    }
+/**
+ * Retrieves a book by its unique ID.
+ *
+ * @param id - The unique identifier of the book to retrieve.
+ * @returns The book with the specified {@link id}, or undefined if not found.
+ *
+ * @throws {Error} If a database error occurs during retrieval.
+ */
+export async function getBookById(id: string, env: Env): Promise<Book | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db.select().from(books).where(eq(books.id, id));
+    return results[0];
+  } catch (error) {
+    console.error('Error getting book by ID:', error);
+    throw new Error(`Failed to retrieve book: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Adds a new book to the database with a generated unique ID.
+ *
+ * @param bookData - The book details excluding the ID.
+ * @returns The newly added book, including its generated ID.
+ *
+ * @throws {Error} If the book could not be added to the database.
+ */
+export async function addBook(bookData: Omit<Book, 'id'>, env: Env): Promise<Book> {
+  const newBook = {
+    ...bookData,
+    id: uuidv4()
   };
 
-  if (data) {
-    options.body = JSON.stringify(data);
-  }
-
-  const response = await fetch(`/api/${endpoint}`, options);
-
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.statusText}`);
-  }
-
-  return await response.json() as T;
-}
-
-// CRUD operations for books - smart routing between server and client contexts
-export async function getAllBooks(): Promise<Book[]> {
-  if (isBrowser) {
-    return await apiRequest<Book[]>('books');
-  } else {
-    return store.getAllBooks();
+  try {
+    const db = getDbClient(env);
+    await db.insert(books).values(newBook);
+    return newBook;
+  } catch (error) {
+    console.error('Error adding book:', error);
+    throw new Error(`Failed to add book: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-export async function getBookById(id: string): Promise<Book | undefined> {
-  if (isBrowser) {
-    return await apiRequest<Book | undefined>(`books/${id}`);
-  } else {
-    return store.getBookById(id);
+/**
+ * Updates the specified fields of a book by its ID and returns the updated book.
+ *
+ * @param id - The unique identifier of the book to update.
+ * @param updates - An object containing the fields to update.
+ * @returns The updated book, or undefined if no book with the given ID exists.
+ *
+ * @throws {Error} If the update operation fails.
+ */
+export async function updateBook(id: string, updates: Partial<Omit<Book, 'id'>>, env: Env): Promise<Book | undefined> {
+  try {
+    const db = getDbClient(env);
+    await db.update(books).set(updates).where(eq(books.id, id));
+
+    // Get the updated book
+    const results = await db.select().from(books).where(eq(books.id, id));
+    return results[0];
+  } catch (error) {
+    console.error('Error updating book:', error);
+    throw new Error(`Failed to update book: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-export async function addBook(book: Omit<Book, 'id'>): Promise<Book> {
-  if (isBrowser) {
-    return await apiRequest<Book>('books', 'POST', book);
-  } else {
-    return store.addBook(book);
+/**
+ * Deletes a book by its ID.
+ *
+ * @param id - The unique identifier of the book to delete.
+ * @returns True if the book was deleted; false if no matching book was found.
+ *
+ * @throws {Error} If a database error occurs during deletion.
+ */
+export async function deleteBook(id: string, env: Env): Promise<boolean> {
+  try {
+    const db = getDbClient(env);
+    const result = await db.delete(books).where(eq(books.id, id));
+    return 'changes' in result ? result.changes > 0 : false;
+  } catch (error) {
+    console.error('Error deleting book:', error);
+    throw new Error(`Failed to delete book: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-export async function updateBook(id: string, updates: Partial<Omit<Book, 'id'>>): Promise<Book | undefined> {
-  if (isBrowser) {
-    return await apiRequest<Book | undefined>(`books/${id}`, 'PUT', updates);
-  } else {
-    return store.updateBook(id, updates);
+/**
+ * Retrieves all reading sessions from the database.
+ *
+ * @returns An array of all {@link ReadingSession} records.
+ *
+ * @throws {Error} If the database query fails.
+ */
+export async function getAllReadingSessions(env: Env): Promise<ReadingSession[]> {
+  try {
+    const db = getDbClient(env);
+    return await db.select().from(readingSessions);
+  } catch (error) {
+    console.error('Error getting all reading sessions:', error);
+    throw new Error(`Failed to get all reading sessions: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-export async function deleteBook(id: string): Promise<boolean> {
-  if (isBrowser) {
-    return await apiRequest<boolean>(`books/${id}`, 'DELETE');
-  } else {
-    return store.deleteBook(id);
+/**
+ * Retrieves all reading sessions associated with a specific book.
+ *
+ * @param bookId - The ID of the book whose reading sessions are to be fetched.
+ * @returns An array of {@link ReadingSession} objects for the specified book.
+ *
+ * @throws {Error} If the database query fails.
+ */
+export async function getReadingSessionsForBook(bookId: string, env: Env): Promise<ReadingSession[]> {
+  try {
+    const db = getDbClient(env);
+    return await db.select().from(readingSessions).where(eq(readingSessions.bookId, bookId));
+  } catch (error) {
+    console.error('Error getting reading sessions for book:', error);
+    throw new Error(`Failed to get reading sessions for book: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-// CRUD operations for reading sessions
-export async function getAllReadingSessions(): Promise<ReadingSession[]> {
-  if (isBrowser) {
-    return await apiRequest<ReadingSession[]>('reading-sessions');
-  } else {
-    return store.getAllReadingSessions();
+/**
+ * Retrieves a reading session by its unique ID.
+ *
+ * @param sessionId - The ID of the reading session to retrieve.
+ * @returns The matching {@link ReadingSession} if found, or null if not found.
+ *
+ * @throws {Error} If a database error occurs during retrieval.
+ */
+export async function getReadingSessionById(
+  sessionId: string,
+  env: Env
+): Promise<ReadingSession | null> {
+  try {
+    const db = getDbClient(env);
+    const [session] = await db
+      .select()
+      .from(readingSessions)
+      .where(eq(readingSessions.id, sessionId))
+      .limit(1);
+    return session ?? null;
+  } catch (error) {
+    console.error('Error getting reading session by ID:', error);
+    throw new Error(`Failed to get reading session by ID: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-export async function getReadingSessionsForBook(bookId: string): Promise<ReadingSession[]> {
-  if (isBrowser) {
-    return await apiRequest<ReadingSession[]>(`reading-sessions/book/${bookId}`);
-  } else {
-    return store.getReadingSessionsForBook(bookId);
+/**
+ * Adds a new reading session to the database and returns the created session.
+ *
+ * @returns The newly created {@link ReadingSession} object, including its generated ID.
+ *
+ * @throws {Error} If the reading session could not be added to the database.
+ */
+export async function addReadingSession(sessionData: Omit<ReadingSession, 'id'>, env: Env): Promise<ReadingSession> {
+  const newSession = {
+    ...sessionData,
+    id: uuidv4()
+  };
+
+  try {
+    const db = getDbClient(env);
+    await db.insert(readingSessions).values(newSession);
+    return newSession;
+  } catch (error) {
+    console.error('Error adding reading session:', error);
+    throw new Error(`Failed to add reading session: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-export async function addReadingSession(session: Omit<ReadingSession, 'id'>): Promise<ReadingSession> {
-  if (isBrowser) {
-    return await apiRequest<ReadingSession>('reading-sessions', 'POST', session);
-  } else {
-    return store.addReadingSession(session);
+/**
+ * Updates a reading session by its ID with the specified fields.
+ *
+ * @param id - The ID of the reading session to update.
+ * @param updates - The fields to update in the reading session.
+ * @returns The updated reading session, or undefined if not found.
+ *
+ * @throws {Error} If the update operation fails.
+ */
+export async function updateReadingSession(id: string, updates: Partial<Omit<ReadingSession, 'id'>>, env: Env): Promise<ReadingSession | undefined> {
+  try {
+    const db = getDbClient(env);
+    await db.update(readingSessions).set(updates).where(eq(readingSessions.id, id));
+
+    // Get the updated session
+    const results = await db.select().from(readingSessions).where(eq(readingSessions.id, id));
+    return results[0];
+  } catch (error) {
+    console.error('Error updating reading session:', error);
+    throw new Error(`Failed to update reading session: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-export async function updateReadingSession(id: string, updates: Partial<Omit<ReadingSession, 'id'>>): Promise<ReadingSession | undefined> {
-  if (isBrowser) {
-    return await apiRequest<ReadingSession | undefined>(`reading-sessions/${id}`, 'PUT', updates);
-  } else {
-    return store.updateReadingSession(id, updates);
+/**
+ * Deletes a reading session by its ID.
+ *
+ * @param id - The unique identifier of the reading session to delete.
+ * @returns True if the reading session was deleted; false if no matching session was found.
+ *
+ * @throws {Error} If a database error occurs during deletion.
+ */
+export async function deleteReadingSession(id: string, env: Env): Promise<boolean> {
+  try {
+    const db = getDbClient(env);
+    const result = await db.delete(readingSessions).where(eq(readingSessions.id, id));
+    return 'changes' in result ? result.changes > 0 : false;
+  } catch (error) {
+    console.error('Error deleting reading session:', error);
+    throw new Error(`Failed to delete reading session: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-export async function deleteReadingSession(id: string): Promise<boolean> {
-  if (isBrowser) {
-    return await apiRequest<boolean>(`reading-sessions/${id}`, 'DELETE');
-  } else {
-    return store.deleteReadingSession(id);
+/**
+ * Retrieves all books that are currently being read, based on reading sessions and total pages read.
+ *
+ * @returns A promise that resolves to an array of books with ongoing reading sessions and unread pages remaining.
+ *
+ * @throws {Error} If the database query fails.
+ */
+export async function getCurrentlyReadingBooks(env: Env): Promise<Book[]> {
+  try {
+    const db = getDbClient(env);
+
+    // Use a combination of select and prepared statements for better performance
+    return await db
+      .select()
+      .from(books)
+      .where(
+        sql`EXISTS (
+          SELECT 1 
+          FROM ${readingSessions}
+          WHERE ${readingSessions.bookId} = ${books.id}
+        )
+        AND (
+          SELECT COALESCE(SUM(${readingSessions.pagesRead}), 0)
+          FROM ${readingSessions}
+          WHERE ${readingSessions.bookId} = ${books.id}
+        ) < ${books.pageCount}`
+      );
+  } catch (error) {
+    console.error('Error getting currently reading books:', error);
+    throw new Error(`Failed to get currently reading books: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-// Currently reading books
-export async function getCurrentlyReadingBooks(): Promise<Book[]> {
-  if (isBrowser) {
-    return await apiRequest<Book[]>('books/currently-reading');
-  } else {
-    return store.getCurrentlyReadingBooks();
+/**
+ * Retrieves a book by matching its title and author, using case-insensitive comparison.
+ *
+ * @param title - The title of the book to search for.
+ * @param author - The author of the book to search for.
+ * @returns The matching {@link Book}, or undefined if no match is found.
+ *
+ * @throws {Error} If a database error occurs during the query.
+ */
+export async function getBookByTitleAndAuthor(title: string, author: string, env: Env): Promise<Book | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db
+      .select()
+      .from(books)
+      .where(
+        and(
+          ilike(books.title, title),
+          ilike(books.author, author)
+        )
+      );
+    return results[0];
+  } catch (error) {
+    console.error('Error getting book by title and author:', error);
+    throw new Error(`Failed to get book by title and author: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-} 
+}

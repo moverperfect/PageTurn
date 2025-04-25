@@ -1,13 +1,11 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
-import { getAllBooks } from '../../../lib/db';
-import { getReadingSessionById } from '../../../lib/store';
+import { getAllBooks, getReadingSessionById } from '../../../lib/db';
 
 // Get the session ID from URL params
 const { id } = Astro.params;
 
-// Fetch the reading session
-const session = await getReadingSessionById(id!);
+const session = await getReadingSessionById(id!, Astro.locals.runtime.env);
 
 // Handle case where session is not found
 if (!session) {
@@ -15,7 +13,7 @@ if (!session) {
 }
 
 // Fetch all books for the dropdown
-const books = await getAllBooks();
+const books = await getAllBooks(Astro.locals.runtime.env);
 
 // Format seconds to HH:MM:SS
 function formatDuration(seconds: number): string {
@@ -114,7 +112,10 @@ const formattedDuration = formatDuration(session.duration);
   </div>
 </Layout>
 
-<script define:vars={{ sessionId: id, sessionDuration: session.duration }}>
+<script
+  is:inline
+  define:vars={{ sessionId: id, sessionDuration: session.duration }}
+>
   // Parse HH:MM:SS to seconds
   function parseDuration(timeString) {
     if (!timeString) return 0;

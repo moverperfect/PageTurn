@@ -2,7 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import { getAllBooks } from '../../lib/db';
 
-const books = await getAllBooks();
+const books = await getAllBooks(Astro.locals.runtime.env);
 ---
 
 <Layout title="Log Reading Session | PageTurn">
@@ -136,11 +136,13 @@ const books = await getAllBooks();
     const minutesPerPageSpan = document.getElementById('minutesPerPage');
 
     // Parse HH:MM:SS to seconds
-    function parseDuration(timeString) {
+    function parseDuration(timeString: string) {
       if (!timeString) return 0;
 
       // Handle different formats
-      const parts = timeString.split(':').map((part) => parseInt(part) || 0);
+      const parts = timeString
+        .split(':')
+        .map((part: string) => parseInt(part) || 0);
 
       if (parts.length === 3) {
         // HH:MM:SS
