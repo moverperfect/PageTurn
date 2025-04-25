@@ -4,7 +4,15 @@ import { getDbClient } from './db-client';
 import { books, readingSessions, type Book, type ReadingSession } from './schema';
 import { v4 as uuidv4 } from 'uuid';
 
-// Helper functions to calculate statistics
+/**
+ * Calculates reading progress statistics for a book based on its reading sessions.
+ *
+ * Returns an object containing the total pages read, percent complete, average minutes per page, pages per hour, and estimated hours left to finish the book.
+ *
+ * @param book - The book for which to calculate progress.
+ * @param sessions - All reading sessions, including those for other books.
+ * @returns An object with progress metrics: {@link pagesRead}, {@link percentComplete}, {@link minutesPerPage}, {@link pagesPerHour}, and {@link estimatedHoursLeft}.
+ */
 export function calculateProgress(book: Book, sessions: ReadingSession[]): {
   pagesRead: number;
   percentComplete: number;
@@ -33,6 +41,15 @@ export function calculateProgress(book: Book, sessions: ReadingSession[]): {
   };
 }
 
+/**
+ * Estimates the finish date for a book based on past reading sessions.
+ *
+ * Calculates the average interval between sessions and average pages read per session to project when the book will be completed. Returns null if there are no sessions for the book.
+ *
+ * @param book - The book for which to estimate the finish date.
+ * @param sessions - All reading sessions, including those for other books.
+ * @returns A Date representing the estimated finish date, or null if no sessions exist for the book.
+ */
 export function estimateFinishDate(book: Book, sessions: ReadingSession[]): Date | null {
   const bookSessions = sessions.filter(session => session.bookId === book.id);
   if (bookSessions.length === 0) return null;
@@ -68,12 +85,24 @@ export function estimateFinishDate(book: Book, sessions: ReadingSession[]): Date
   return finishDate;
 }
 
-// CRUD operations for books
+/**
+ * Retrieves all books from the database.
+ *
+ * @returns A promise that resolves to an array of all books.
+ */
 export async function getAllBooks(env: Env): Promise<Book[]> {
   const db = getDbClient(env);
   return await db.select().from(books);
 }
 
+/**
+ * Retrieves a book by its unique ID.
+ *
+ * @param id - The unique identifier of the book to retrieve.
+ * @returns The book with the specified {@link id}, or undefined if not found.
+ *
+ * @throws {Error} If a database error occurs during retrieval.
+ */
 export async function getBookById(id: string, env: Env): Promise<Book | undefined> {
   try {
     const db = getDbClient(env);
@@ -85,6 +114,14 @@ export async function getBookById(id: string, env: Env): Promise<Book | undefine
   }
 }
 
+/**
+ * Adds a new book to the database with a generated unique ID.
+ *
+ * @param bookData - The book details excluding the ID.
+ * @returns The newly added book, including its generated ID.
+ *
+ * @throws {Error} If the book could not be added to the database.
+ */
 export async function addBook(bookData: Omit<Book, 'id'>, env: Env): Promise<Book> {
   const newBook = {
     ...bookData,
@@ -101,6 +138,15 @@ export async function addBook(bookData: Omit<Book, 'id'>, env: Env): Promise<Boo
   }
 }
 
+/**
+ * Updates the specified fields of a book by its ID and returns the updated book.
+ *
+ * @param id - The unique identifier of the book to update.
+ * @param updates - An object containing the fields to update.
+ * @returns The updated book, or undefined if no book with the given ID exists.
+ *
+ * @throws {Error} If the update operation fails.
+ */
 export async function updateBook(id: string, updates: Partial<Omit<Book, 'id'>>, env: Env): Promise<Book | undefined> {
   try {
     const db = getDbClient(env);
@@ -115,6 +161,14 @@ export async function updateBook(id: string, updates: Partial<Omit<Book, 'id'>>,
   }
 }
 
+/**
+ * Deletes a book by its ID.
+ *
+ * @param id - The unique identifier of the book to delete.
+ * @returns True if the book was deleted; false if no matching book was found.
+ *
+ * @throws {Error} If a database error occurs during deletion.
+ */
 export async function deleteBook(id: string, env: Env): Promise<boolean> {
   try {
     const db = getDbClient(env);
@@ -126,7 +180,13 @@ export async function deleteBook(id: string, env: Env): Promise<boolean> {
   }
 }
 
-// CRUD operations for reading sessions
+/**
+ * Retrieves all reading sessions from the database.
+ *
+ * @returns An array of all {@link ReadingSession} records.
+ *
+ * @throws {Error} If the database query fails.
+ */
 export async function getAllReadingSessions(env: Env): Promise<ReadingSession[]> {
   try {
     const db = getDbClient(env);
@@ -137,6 +197,14 @@ export async function getAllReadingSessions(env: Env): Promise<ReadingSession[]>
   }
 }
 
+/**
+ * Retrieves all reading sessions associated with a specific book.
+ *
+ * @param bookId - The ID of the book whose reading sessions are to be fetched.
+ * @returns An array of {@link ReadingSession} objects for the specified book.
+ *
+ * @throws {Error} If the database query fails.
+ */
 export async function getReadingSessionsForBook(bookId: string, env: Env): Promise<ReadingSession[]> {
   try {
     const db = getDbClient(env);
@@ -147,6 +215,14 @@ export async function getReadingSessionsForBook(bookId: string, env: Env): Promi
   }
 }
 
+/**
+ * Retrieves a reading session by its unique ID.
+ *
+ * @param sessionId - The ID of the reading session to retrieve.
+ * @returns The matching {@link ReadingSession} if found, or null if not found.
+ *
+ * @throws {Error} If a database error occurs during retrieval.
+ */
 export async function getReadingSessionById(
   sessionId: string,
   env: Env
@@ -165,6 +241,13 @@ export async function getReadingSessionById(
   }
 }
 
+/**
+ * Adds a new reading session to the database and returns the created session.
+ *
+ * @returns The newly created {@link ReadingSession} object, including its generated ID.
+ *
+ * @throws {Error} If the reading session could not be added to the database.
+ */
 export async function addReadingSession(sessionData: Omit<ReadingSession, 'id'>, env: Env): Promise<ReadingSession> {
   const newSession = {
     ...sessionData,
@@ -181,6 +264,15 @@ export async function addReadingSession(sessionData: Omit<ReadingSession, 'id'>,
   }
 }
 
+/**
+ * Updates a reading session by its ID with the specified fields.
+ *
+ * @param id - The ID of the reading session to update.
+ * @param updates - The fields to update in the reading session.
+ * @returns The updated reading session, or undefined if not found.
+ *
+ * @throws {Error} If the update operation fails.
+ */
 export async function updateReadingSession(id: string, updates: Partial<Omit<ReadingSession, 'id'>>, env: Env): Promise<ReadingSession | undefined> {
   try {
     const db = getDbClient(env);
@@ -195,6 +287,14 @@ export async function updateReadingSession(id: string, updates: Partial<Omit<Rea
   }
 }
 
+/**
+ * Deletes a reading session by its ID.
+ *
+ * @param id - The unique identifier of the reading session to delete.
+ * @returns True if the reading session was deleted; false if no matching session was found.
+ *
+ * @throws {Error} If a database error occurs during deletion.
+ */
 export async function deleteReadingSession(id: string, env: Env): Promise<boolean> {
   try {
     const db = getDbClient(env);
@@ -206,7 +306,13 @@ export async function deleteReadingSession(id: string, env: Env): Promise<boolea
   }
 }
 
-// Currently reading books
+/**
+ * Retrieves all books that are currently being read, based on reading sessions and total pages read.
+ *
+ * @returns A promise that resolves to an array of books with ongoing reading sessions and unread pages remaining.
+ *
+ * @throws {Error} If the database query fails.
+ */
 export async function getCurrentlyReadingBooks(env: Env): Promise<Book[]> {
   try {
     const db = getDbClient(env);
@@ -233,6 +339,15 @@ export async function getCurrentlyReadingBooks(env: Env): Promise<Book[]> {
   }
 }
 
+/**
+ * Retrieves a book by matching its title and author, using case-insensitive comparison.
+ *
+ * @param title - The title of the book to search for.
+ * @param author - The author of the book to search for.
+ * @returns The matching {@link Book}, or undefined if no match is found.
+ *
+ * @throws {Error} If a database error occurs during the query.
+ */
 export async function getBookByTitleAndAuthor(title: string, author: string, env: Env): Promise<Book | undefined> {
   try {
     const db = getDbClient(env);

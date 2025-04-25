@@ -47,7 +47,14 @@ async function fetchSheetData(sheetId: string, sheetName: string = 'Sheet1'): Pr
   }
 }
 
-// Helper function to parse CSV
+/**
+ * Parses CSV text into a two-dimensional array of strings.
+ *
+ * Handles quoted fields, embedded commas, escaped quotes, and normalizes line endings.
+ *
+ * @param text - The CSV-formatted string to parse.
+ * @returns An array of rows, each row being an array of field values.
+ */
 function parseCSV(text: string): string[][] {
   const lines = text.replace(/\r\n?/g, '\n').split('\n');
 
@@ -130,7 +137,14 @@ function parseDuration(durationStr: string): number {
   return parseFloat(durationStr) || 0;
 }
 
-// Parse date in various formats including dd/mm/yyyy
+/**
+ * Parses a date string in various formats and returns an ISO 8601 string.
+ *
+ * Supports `dd/mm/yyyy` format by converting it to ISO format. Falls back to standard JavaScript date parsing for other formats. If parsing fails or the input is empty, returns the current date in ISO format.
+ *
+ * @param dateStr - The date string to parse.
+ * @returns The parsed date as an ISO 8601 string.
+ */
 function parseDate(dateStr: string): string {
   if (!dateStr) return new Date().toISOString();
 
@@ -157,7 +171,17 @@ function parseDate(dateStr: string): string {
   }
 }
 
-// Convert sheet data to ReadingSession objects
+/**
+ * Converts raw sheet data into an array of reading session objects, resolving book references asynchronously.
+ *
+ * Each row must include a date and either a title with author or a library book number. If a title and author are provided, the corresponding book is looked up in the database; otherwise, the library book number is used as the book ID. Parses and normalizes fields such as pages read, duration (in seconds), date, and finished status.
+ *
+ * @param sheetData - Array of objects representing rows from the sheet.
+ * @param env - Environment context used for database lookups.
+ * @returns A promise that resolves to an array of reading session objects without IDs.
+ *
+ * @throws {Error} If required fields are missing or if a referenced book cannot be found.
+ */
 async function convertToReadingSessions(sheetData: any[], env: Env): Promise<Omit<ReadingSession, 'id'>[]> {
   const sessionPromises = sheetData.map(async row => {
     // We need date and either (title + author) or (library book #)
