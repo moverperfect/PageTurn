@@ -1,31 +1,8 @@
 // Types for our book and reading session data
-import * as store from './store';
-
-export interface Book {
-  id: string;
-  title: string;
-  author: string;
-  format: string;
-  pageCount: number;
-  isbn: string;
-  authorSex: 'M' | 'F' | 'Other' | 'Unknown';
-  recommended: boolean;
-  genre: string;
-  publishedYear: number;
-  publisher: string;
-  dateAcquired: string;
-  dateRemoved: string | null;
-  cost: number;
-}
-
-export interface ReadingSession {
-  id: string;
-  date: string;
-  bookId: string;
-  pagesRead: number;
-  duration: number; // in seconds
-  finished: boolean;
-}
+import { eq, and, ilike, sql } from 'drizzle-orm';
+import { getDbClient } from './db-client';
+import { books, readingSessions, type Book, type ReadingSession } from './schema';
+import { v4 as uuidv4 } from 'uuid';
 
 // Helper functions to calculate statistics
 export function calculateProgress(book: Book, sessions: ReadingSession[]): {
@@ -41,8 +18,8 @@ export function calculateProgress(book: Book, sessions: ReadingSession[]): {
 
   const totalDurationSeconds = bookSessions.reduce((sum, session) => sum + session.duration, 0);
   const totalDurationMinutes = totalDurationSeconds / 60;
-  const minutesPerPage = totalDurationMinutes / pagesRead || 0;
-  const pagesPerHour = pagesRead / (totalDurationMinutes / 60) || 0;
+  const minutesPerPage = pagesRead === 0 ? 0 : totalDurationMinutes / pagesRead;
+  const pagesPerHour = totalDurationMinutes === 0 ? 0 : pagesRead / (totalDurationMinutes / 60);
 
   const pagesLeft = book.pageCount - pagesRead;
   const estimatedHoursLeft = (pagesLeft * minutesPerPage) / 60;
@@ -91,122 +68,186 @@ export function estimateFinishDate(book: Book, sessions: ReadingSession[]): Date
   return finishDate;
 }
 
-// Determine if we're in a browser or server context
-const isBrowser = typeof window !== 'undefined';
+// CRUD operations for books
+export async function getAllBooks(env: Env): Promise<Book[]> {
+  const db = getDbClient(env);
+  return await db.select().from(books);
+}
 
-// Helper function to make API requests (only used in browser context)
-async function apiRequest<T>(
-  endpoint: string,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
-  data?: any
-): Promise<T> {
-  const options: RequestInit = {
-    method,
-    headers: {
-      'Content-Type': 'application/json'
-    }
+export async function getBookById(id: string, env: Env): Promise<Book | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db.select().from(books).where(eq(books.id, id));
+    return results[0];
+  } catch (error) {
+    console.error('Error getting book by ID:', error);
+    throw new Error(`Failed to retrieve book: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export async function addBook(bookData: Omit<Book, 'id'>, env: Env): Promise<Book> {
+  const newBook = {
+    ...bookData,
+    id: uuidv4()
   };
 
-  if (data) {
-    options.body = JSON.stringify(data);
-  }
-
-  const response = await fetch(`/api/${endpoint}`, options);
-
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.statusText}`);
-  }
-
-  return await response.json() as T;
-}
-
-// CRUD operations for books - smart routing between server and client contexts
-export async function getAllBooks(): Promise<Book[]> {
-  if (isBrowser) {
-    return await apiRequest<Book[]>('books');
-  } else {
-    return store.getAllBooks();
+  try {
+    const db = getDbClient(env);
+    await db.insert(books).values(newBook);
+    return newBook;
+  } catch (error) {
+    console.error('Error adding book:', error);
+    throw new Error(`Failed to add book: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-export async function getBookById(id: string): Promise<Book | undefined> {
-  if (isBrowser) {
-    return await apiRequest<Book | undefined>(`books/${id}`);
-  } else {
-    return store.getBookById(id);
+export async function updateBook(id: string, updates: Partial<Omit<Book, 'id'>>, env: Env): Promise<Book | undefined> {
+  try {
+    const db = getDbClient(env);
+    await db.update(books).set(updates).where(eq(books.id, id));
+
+    // Get the updated book
+    const results = await db.select().from(books).where(eq(books.id, id));
+    return results[0];
+  } catch (error) {
+    console.error('Error updating book:', error);
+    throw new Error(`Failed to update book: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-export async function addBook(book: Omit<Book, 'id'>): Promise<Book> {
-  if (isBrowser) {
-    return await apiRequest<Book>('books', 'POST', book);
-  } else {
-    return store.addBook(book);
-  }
-}
-
-export async function updateBook(id: string, updates: Partial<Omit<Book, 'id'>>): Promise<Book | undefined> {
-  if (isBrowser) {
-    return await apiRequest<Book | undefined>(`books/${id}`, 'PUT', updates);
-  } else {
-    return store.updateBook(id, updates);
-  }
-}
-
-export async function deleteBook(id: string): Promise<boolean> {
-  if (isBrowser) {
-    return await apiRequest<boolean>(`books/${id}`, 'DELETE');
-  } else {
-    return store.deleteBook(id);
+export async function deleteBook(id: string, env: Env): Promise<boolean> {
+  try {
+    const db = getDbClient(env);
+    const result = await db.delete(books).where(eq(books.id, id));
+    return 'changes' in result ? result.changes > 0 : false;
+  } catch (error) {
+    console.error('Error deleting book:', error);
+    throw new Error(`Failed to delete book: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 // CRUD operations for reading sessions
-export async function getAllReadingSessions(): Promise<ReadingSession[]> {
-  if (isBrowser) {
-    return await apiRequest<ReadingSession[]>('reading-sessions');
-  } else {
-    return store.getAllReadingSessions();
+export async function getAllReadingSessions(env: Env): Promise<ReadingSession[]> {
+  try {
+    const db = getDbClient(env);
+    return await db.select().from(readingSessions);
+  } catch (error) {
+    console.error('Error getting all reading sessions:', error);
+    throw new Error(`Failed to get all reading sessions: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-export async function getReadingSessionsForBook(bookId: string): Promise<ReadingSession[]> {
-  if (isBrowser) {
-    return await apiRequest<ReadingSession[]>(`reading-sessions/book/${bookId}`);
-  } else {
-    return store.getReadingSessionsForBook(bookId);
+export async function getReadingSessionsForBook(bookId: string, env: Env): Promise<ReadingSession[]> {
+  try {
+    const db = getDbClient(env);
+    return await db.select().from(readingSessions).where(eq(readingSessions.bookId, bookId));
+  } catch (error) {
+    console.error('Error getting reading sessions for book:', error);
+    throw new Error(`Failed to get reading sessions for book: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-export async function addReadingSession(session: Omit<ReadingSession, 'id'>): Promise<ReadingSession> {
-  if (isBrowser) {
-    return await apiRequest<ReadingSession>('reading-sessions', 'POST', session);
-  } else {
-    return store.addReadingSession(session);
+export async function getReadingSessionById(
+  sessionId: string,
+  env: Env
+): Promise<ReadingSession | null> {
+  try {
+    const db = getDbClient(env);
+    const [session] = await db
+      .select()
+      .from(readingSessions)
+      .where(eq(readingSessions.id, sessionId))
+      .limit(1);
+    return session ?? null;
+  } catch (error) {
+    console.error('Error getting reading session by ID:', error);
+    throw new Error(`Failed to get reading session by ID: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-export async function updateReadingSession(id: string, updates: Partial<Omit<ReadingSession, 'id'>>): Promise<ReadingSession | undefined> {
-  if (isBrowser) {
-    return await apiRequest<ReadingSession | undefined>(`reading-sessions/${id}`, 'PUT', updates);
-  } else {
-    return store.updateReadingSession(id, updates);
+export async function addReadingSession(sessionData: Omit<ReadingSession, 'id'>, env: Env): Promise<ReadingSession> {
+  const newSession = {
+    ...sessionData,
+    id: uuidv4()
+  };
+
+  try {
+    const db = getDbClient(env);
+    await db.insert(readingSessions).values(newSession);
+    return newSession;
+  } catch (error) {
+    console.error('Error adding reading session:', error);
+    throw new Error(`Failed to add reading session: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-export async function deleteReadingSession(id: string): Promise<boolean> {
-  if (isBrowser) {
-    return await apiRequest<boolean>(`reading-sessions/${id}`, 'DELETE');
-  } else {
-    return store.deleteReadingSession(id);
+export async function updateReadingSession(id: string, updates: Partial<Omit<ReadingSession, 'id'>>, env: Env): Promise<ReadingSession | undefined> {
+  try {
+    const db = getDbClient(env);
+    await db.update(readingSessions).set(updates).where(eq(readingSessions.id, id));
+
+    // Get the updated session
+    const results = await db.select().from(readingSessions).where(eq(readingSessions.id, id));
+    return results[0];
+  } catch (error) {
+    console.error('Error updating reading session:', error);
+    throw new Error(`Failed to update reading session: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export async function deleteReadingSession(id: string, env: Env): Promise<boolean> {
+  try {
+    const db = getDbClient(env);
+    const result = await db.delete(readingSessions).where(eq(readingSessions.id, id));
+    return 'changes' in result ? result.changes > 0 : false;
+  } catch (error) {
+    console.error('Error deleting reading session:', error);
+    throw new Error(`Failed to delete reading session: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 // Currently reading books
-export async function getCurrentlyReadingBooks(): Promise<Book[]> {
-  if (isBrowser) {
-    return await apiRequest<Book[]>('books/currently-reading');
-  } else {
-    return store.getCurrentlyReadingBooks();
+export async function getCurrentlyReadingBooks(env: Env): Promise<Book[]> {
+  try {
+    const db = getDbClient(env);
+
+    // Use a combination of select and prepared statements for better performance
+    return await db
+      .select()
+      .from(books)
+      .where(
+        sql`EXISTS (
+          SELECT 1 
+          FROM ${readingSessions}
+          WHERE ${readingSessions.bookId} = ${books.id}
+        )
+        AND (
+          SELECT COALESCE(SUM(${readingSessions.pagesRead}), 0)
+          FROM ${readingSessions}
+          WHERE ${readingSessions.bookId} = ${books.id}
+        ) < ${books.pageCount}`
+      );
+  } catch (error) {
+    console.error('Error getting currently reading books:', error);
+    throw new Error(`Failed to get currently reading books: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-} 
+}
+
+export async function getBookByTitleAndAuthor(title: string, author: string, env: Env): Promise<Book | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db
+      .select()
+      .from(books)
+      .where(
+        and(
+          ilike(books.title, title),
+          ilike(books.author, author)
+        )
+      );
+    return results[0];
+  } catch (error) {
+    console.error('Error getting book by title and author:', error);
+    throw new Error(`Failed to get book by title and author: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}

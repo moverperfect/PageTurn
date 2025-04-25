@@ -1,12 +1,102 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import { addBook } from '../../lib/db';
+
+// Handle form submission
+let errorMessage = '';
+// Default form values
+let formData = {
+  title: '',
+  author: '',
+  format: '',
+  pageCount: '',
+  isbn: '',
+  authorSex: 'Unknown',
+  recommended: false,
+  genre: '',
+  publishedYear: '',
+  publisher: '',
+  dateAcquired: new Date().toISOString().split('T')[0],
+  cost: '',
+};
+
+if (Astro.request.method === 'POST') {
+  try {
+    const data = await Astro.request.formData();
+
+    // Update form values with submitted data
+    formData = {
+      title: (data.get('title') as string) || '',
+      author: (data.get('author') as string) || '',
+      format: (data.get('format') as string) || '',
+      pageCount: (data.get('pageCount') as string) || '',
+      isbn: (data.get('isbn') as string) || '',
+      authorSex:
+        (data.get('authorSex') as 'M' | 'F' | 'Other' | 'Unknown') || 'Unknown',
+      recommended: data.get('recommended') === 'true',
+      genre: (data.get('genre') as string) || '',
+      publishedYear: (data.get('publishedYear') as string) || '',
+      publisher: (data.get('publisher') as string) || '',
+      dateAcquired:
+        (data.get('dateAcquired') as string) ||
+        new Date().toISOString().split('T')[0],
+      cost: (data.get('cost') as string) || '',
+    };
+
+    const book = {
+      title: formData.title,
+      author: formData.author,
+      format: formData.format,
+      pageCount: parseInt(formData.pageCount) || 0,
+      isbn: formData.isbn,
+      authorSex: formData.authorSex as 'M' | 'F' | 'Other' | 'Unknown',
+      recommended: formData.recommended,
+      genre: formData.genre,
+      publishedYear: parseInt(formData.publishedYear) || 0,
+      publisher: formData.publisher,
+      dateAcquired: formData.dateAcquired,
+      dateRemoved: null,
+      cost: parseFloat(formData.cost) || 0,
+    };
+
+    // Validate required fields
+    const errors = [];
+    if (!book.title) errors.push('Title is required');
+    if (!book.author) errors.push('Author is required');
+    if (!book.format) errors.push('Format is required');
+    if (book.pageCount <= 0) errors.push('Page count must be greater than 0');
+    if (!book.genre) errors.push('Genre is required');
+
+    if (errors.length > 0) {
+      errorMessage = `Failed to add book: ${errors.join(', ')}`;
+      return;
+    }
+
+    await addBook(book, Astro.locals.runtime.env);
+    return Astro.redirect('/books');
+  } catch (error) {
+    console.error('Error adding book:', error);
+    errorMessage = 'Failed to add book. Please try again.';
+  }
+}
 ---
 
 <Layout title="Add New Book | PageTurn">
   <div>
     <h1>Add New Book</h1>
 
-    <form id="addBookForm" class="max-w-3xl mt-6 space-y-6">
+    {
+      errorMessage && (
+        <div
+          class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
+          role="alert"
+        >
+          <p>{errorMessage}</p>
+        </div>
+      )
+    }
+
+    <form method="POST" id="addBookForm" class="max-w-3xl mt-6 space-y-6">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label for="title" class="form-label">Title</label>
@@ -16,6 +106,7 @@ import Layout from '../../layouts/Layout.astro';
             name="title"
             required
             class="form-input"
+            value={formData.title}
           />
         </div>
 
@@ -27,17 +118,28 @@ import Layout from '../../layouts/Layout.astro';
             name="author"
             required
             class="form-input"
+            value={formData.author}
           />
         </div>
 
         <div>
           <label for="format" class="form-label">Format</label>
           <select id="format" name="format" required class="form-input">
-            <option value="">Select a format</option>
-            <option value="Hardcover">Hardcover</option>
-            <option value="Paperback">Paperback</option>
-            <option value="E-book">E-book</option>
-            <option value="Audiobook">Audiobook</option>
+            <option value="" selected={formData.format === ''}
+              >Select a format</option
+            >
+            <option value="Hardcover" selected={formData.format === 'Hardcover'}
+              >Hardcover</option
+            >
+            <option value="Paperback" selected={formData.format === 'Paperback'}
+              >Paperback</option
+            >
+            <option value="E-book" selected={formData.format === 'E-book'}
+              >E-book</option
+            >
+            <option value="Audiobook" selected={formData.format === 'Audiobook'}
+              >Audiobook</option
+            >
           </select>
         </div>
 
@@ -50,21 +152,35 @@ import Layout from '../../layouts/Layout.astro';
             required
             min="1"
             class="form-input"
+            value={formData.pageCount}
           />
         </div>
 
         <div>
           <label for="isbn" class="form-label">ISBN/ASIN</label>
-          <input type="text" id="isbn" name="isbn" class="form-input" />
+          <input
+            type="text"
+            id="isbn"
+            name="isbn"
+            class="form-input"
+            value={formData.isbn}
+          />
         </div>
 
         <div>
           <label for="authorSex" class="form-label">Author Sex</label>
           <select id="authorSex" name="authorSex" class="form-input">
-            <option value="Unknown">Unknown</option>
-            <option value="M">Male</option>
-            <option value="F">Female</option>
-            <option value="Other">Other</option>
+            <option value="Unknown" selected={formData.authorSex === 'Unknown'}
+              >Unknown</option
+            >
+            <option value="M" selected={formData.authorSex === 'M'}>Male</option
+            >
+            <option value="F" selected={formData.authorSex === 'F'}
+              >Female</option
+            >
+            <option value="Other" selected={formData.authorSex === 'Other'}
+              >Other</option
+            >
           </select>
         </div>
 
@@ -77,6 +193,7 @@ import Layout from '../../layouts/Layout.astro';
                 name="recommended"
                 value="true"
                 class="form-radio"
+                checked={formData.recommended}
               />
               <span class="ml-2">Yes</span>
             </label>
@@ -86,7 +203,7 @@ import Layout from '../../layouts/Layout.astro';
                 name="recommended"
                 value="false"
                 class="form-radio"
-                checked
+                checked={!formData.recommended}
               />
               <span class="ml-2">No</span>
             </label>
@@ -101,6 +218,7 @@ import Layout from '../../layouts/Layout.astro';
             name="genre"
             required
             class="form-input"
+            value={formData.genre}
           />
         </div>
 
@@ -113,6 +231,7 @@ import Layout from '../../layouts/Layout.astro';
             class="form-input"
             min="1500"
             max={new Date().getFullYear()}
+            value={formData.publishedYear}
           />
         </div>
 
@@ -123,6 +242,7 @@ import Layout from '../../layouts/Layout.astro';
             id="publisher"
             name="publisher"
             class="form-input"
+            value={formData.publisher}
           />
         </div>
 
@@ -133,7 +253,7 @@ import Layout from '../../layouts/Layout.astro';
             id="dateAcquired"
             name="dateAcquired"
             class="form-input"
-            value={new Date().toISOString().split('T')[0]}
+            value={formData.dateAcquired}
           />
         </div>
 
@@ -146,6 +266,7 @@ import Layout from '../../layouts/Layout.astro';
             step="0.01"
             min="0"
             class="form-input"
+            value={formData.cost}
           />
         </div>
       </div>
@@ -157,49 +278,3 @@ import Layout from '../../layouts/Layout.astro';
     </form>
   </div>
 </Layout>
-
-<script>
-  import { addBook } from '../../lib/db';
-
-  document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('addBookForm') as HTMLFormElement;
-
-    if (form) {
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const formData = new FormData(form);
-        const book = {
-          title: formData.get('title') as string,
-          author: formData.get('author') as string,
-          format: formData.get('format') as string,
-          pageCount: parseInt(formData.get('pageCount') as string),
-          isbn: formData.get('isbn') as string,
-          authorSex: formData.get('authorSex') as
-            | 'M'
-            | 'F'
-            | 'Other'
-            | 'Unknown',
-          recommended: formData.get('recommended') === 'true',
-          genre: formData.get('genre') as string,
-          publishedYear: parseInt(formData.get('publishedYear') as string),
-          publisher: formData.get('publisher') as string,
-          dateAcquired: formData.get('dateAcquired') as string,
-          dateRemoved: null,
-          cost: parseFloat(formData.get('cost') as string) || 0,
-        };
-
-        try {
-          // Add the book to the database
-          await addBook(book);
-
-          // Redirect to the books list page
-          window.location.href = '/books';
-        } catch (error) {
-          console.error('Error adding book:', error);
-          alert('Failed to add book. Please try again.');
-        }
-      });
-    }
-  });
-</script>

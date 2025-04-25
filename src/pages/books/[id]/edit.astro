@@ -1,12 +1,12 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
-import { getBookById, updateBook } from '../../../lib/db';
+import { getBookById } from '../../../lib/db';
 
 // Get the book ID from URL params
 const { id } = Astro.params;
 
 // Fetch the book
-const book = await getBookById(id!);
+const book = await getBookById(id!, Astro.locals.runtime.env);
 
 // Handle case where book is not found
 if (!book) {
@@ -14,20 +14,20 @@ if (!book) {
 }
 
 const formatOptions = ['Paperback', 'Hardcover', 'E-book', 'Audiobook'];
-const genres = [
-  'Fiction',
-  'Non-fiction',
-  'Science Fiction',
-  'Fantasy',
-  'Mystery',
-  'Thriller',
-  'Romance',
-  'Biography',
-  'History',
-  'Self-help',
-  'Business',
-  'Other',
-];
+// const genres = [
+//   'Fiction',
+//   'Non-fiction',
+//   'Science Fiction',
+//   'Fantasy',
+//   'Mystery',
+//   'Thriller',
+//   'Romance',
+//   'Biography',
+//   'History',
+//   'Self-help',
+//   'Business',
+//   'Other',
+// ];
 ---
 
 <Layout title="Edit Book | PageTurn">
@@ -217,7 +217,7 @@ const genres = [
   </div>
 </Layout>
 
-<script define:vars={{ bookId: id }}>
+<script is:inline define:vars={{ bookId: id }}>
   document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('editBookForm');
 

@@ -2,7 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import { getAllReadingSessions, getBookById } from '../../lib/db';
 
-const sessions = await getAllReadingSessions();
+const sessions = await getAllReadingSessions(Astro.locals.runtime.env);
 
 // Format seconds to HH:MM:SS
 function formatDuration(seconds: number): string {
@@ -20,7 +20,7 @@ function formatDuration(seconds: number): string {
 // Get book information for each session
 const sessionsWithBookInfo = await Promise.all(
   sessions.map(async (session) => {
-    const book = await getBookById(session.bookId);
+    const book = await getBookById(session.bookId, Astro.locals.runtime.env);
     return {
       ...session,
       bookTitle: book?.title || 'Unknown Book',

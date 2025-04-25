@@ -1,9 +1,9 @@
 import type { APIRoute } from 'astro';
-import { getReadingSessionsForBook } from '../../../../lib/store';
+import { getReadingSessionsForBook } from '../../../../lib/db';
 
-export const GET: APIRoute = async ({ params }) => {
+export const GET: APIRoute = async ({ params, locals }) => {
   const { bookId } = params;
-  const bookSessions = getReadingSessionsForBook(bookId!);
+  const bookSessions = await getReadingSessionsForBook(bookId!, locals.runtime.env);
 
   return new Response(
     JSON.stringify(bookSessions),

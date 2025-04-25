@@ -1,10 +1,10 @@
 import type { APIRoute } from 'astro';
-import type { Book } from '../../../lib/db';
-import { getBookById, updateBook, deleteBook } from '../../../lib/store';
+import type { Book } from '../../../lib/schema';
+import { getBookById, updateBook, deleteBook } from '../../../lib/db';
 
-export const GET: APIRoute = async ({ params }) => {
+export const GET: APIRoute = async ({ params, locals }) => {
   const { id } = params;
-  const book = getBookById(id!);
+  const book = await getBookById(id!, locals.runtime.env);
 
   if (!book) {
     return new Response(
@@ -29,12 +29,12 @@ export const GET: APIRoute = async ({ params }) => {
   );
 };
 
-export const PUT: APIRoute = async ({ params, request }) => {
+export const PUT: APIRoute = async ({ params, request, locals }) => {
   const { id } = params;
 
   try {
     const updates = await request.json() as Partial<Omit<Book, 'id'>>;
-    const updatedBook = updateBook(id!, updates);
+    const updatedBook = await updateBook(id!, updates, locals.runtime.env);
 
     if (!updatedBook) {
       return new Response(
@@ -70,9 +70,9 @@ export const PUT: APIRoute = async ({ params, request }) => {
   }
 };
 
-export const DELETE: APIRoute = async ({ params }) => {
+export const DELETE: APIRoute = async ({ params, locals }) => {
   const { id } = params;
-  const deleted = deleteBook(id!);
+  const deleted = await deleteBook(id!, locals.runtime.env);
 
   return new Response(
     JSON.stringify(deleted),

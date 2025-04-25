@@ -8,8 +8,10 @@ import {
 } from '../lib/db';
 
 // Get currently reading books
-const currentlyReadingBooks = await getCurrentlyReadingBooks();
-const allSessions = await getAllReadingSessions();
+const currentlyReadingBooks = await getCurrentlyReadingBooks(
+  Astro.locals.runtime.env
+);
+const allSessions = await getAllReadingSessions(Astro.locals.runtime.env);
 
 // Calculate statistics for each book
 const booksWithStats = currentlyReadingBooks.map((book) => {

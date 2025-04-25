@@ -26,6 +26,18 @@ PageTurn is a modern reading tracker application that helps you monitor your rea
 | `npm run preview` | Preview your build locally, before deploying |
 | `npm run deploy`  | Deploy to Cloudflare Pages                   |
 
+## Database Management
+
+| Command                      | Action                                         |
+| :--------------------------- | :--------------------------------------------- |
+| `npm run db:generate`        | Generate database migration files              |
+| `npm run db:migrate:local`   | Apply migrations to local development database |
+| `npm run db:migrate:prod`    | Apply migrations to production database        |
+| `npm run db:migrate:preview` | Apply migrations to preview environment        |
+| `npm run db:studio:local`    | Open Drizzle Studio for local database         |
+| `npm run db:studio:preview`  | Open Drizzle Studio for preview database       |
+| `npm run db:studio:prod`     | Open Drizzle Studio for production database    |
+
 ## License
 
 MIT

@@ -1,10 +1,11 @@
 import type { APIRoute } from 'astro';
-import type { ReadingSession } from '../../../lib/db';
-import { getReadingSessionById, updateReadingSession, deleteReadingSession } from '../../../lib/store';
+import type { ReadingSession } from '../../../lib/schema';
+import { updateReadingSession, deleteReadingSession, getReadingSessionById } from '../../../lib/db';
 
-export const GET: APIRoute = async ({ params }) => {
+export const GET: APIRoute = async ({ params, locals }) => {
   const { id } = params;
-  const session = getReadingSessionById(id!);
+  // We'll implement a workaround by filtering all sessions
+  const session = await getReadingSessionById(id!, locals.runtime.env);
 
   if (!session) {
     return new Response(
@@ -29,12 +30,30 @@ export const GET: APIRoute = async ({ params }) => {
   );
 };
 
-export const PUT: APIRoute = async ({ params, request }) => {
+export const PUT: APIRoute = async ({ params, request, locals }) => {
   const { id } = params;
 
   try {
     const updates = await request.json() as Partial<Omit<ReadingSession, 'id'>>;
-    const updatedSession = updateReadingSession(id!, updates);
+    if (!id) {
+      return new Response(
+        JSON.stringify({ error: 'Reading session ID is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    if (updates.pagesRead !== undefined && (typeof updates.pagesRead !== 'number' || updates.pagesRead < 0)) {
+      return new Response(
+        JSON.stringify({ error: 'Pages read must be a positive number' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    if (updates.duration !== undefined && (typeof updates.duration !== 'number' || updates.duration < 0)) {
+      return new Response(
+        JSON.stringify({ error: 'Duration must be a positive number of seconds' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    const updatedSession = await updateReadingSession(id, updates, locals.runtime.env);
 
     if (!updatedSession) {
       return new Response(
@@ -70,9 +89,15 @@ export const PUT: APIRoute = async ({ params, request }) => {
   }
 };
 
-export const DELETE: APIRoute = async ({ params }) => {
+export const DELETE: APIRoute = async ({ params, locals }) => {
   const { id } = params;
-  const deleted = deleteReadingSession(id!);
+  if (!id) {
+    return new Response(
+      JSON.stringify({ error: 'Reading session ID is required' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  const deleted = await deleteReadingSession(id, locals.runtime.env);
 
   return new Response(
     JSON.stringify(deleted),
