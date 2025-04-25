@@ -17,6 +17,25 @@ function formatDuration(seconds: number): string {
   ].join(':');
 }
 
+// Format date in UK format (DD/MM/YYYY)
+function formatDate(dateString: string): string {
+  try {
+    // Parse ISO date string
+    const date = new Date(dateString);
+
+    // Check if the date is valid
+    if (!isNaN(date.getTime())) {
+      return date.toLocaleDateString('en-GB');
+    }
+
+    // Return the original if we couldn't parse it
+    return dateString;
+  } catch (e) {
+    // If parsing fails, return the original
+    return dateString;
+  }
+}
+
 // Get book information for each session
 const sessionsWithBookInfo = await Promise.all(
   sessions.map(async (session) => {
@@ -101,9 +120,7 @@ sessionsWithBookInfo.sort((a, b) => {
 
                   return (
                     <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-slate-800">
-                      <td class="px-4 py-3">
-                        {new Date(session.date).toLocaleDateString()}
-                      </td>
+                      <td class="px-4 py-3">{formatDate(session.date)}</td>
                       <td class="px-4 py-3">
                         <a
                           href={`/books/${session.bookId}`}

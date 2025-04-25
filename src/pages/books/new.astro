@@ -18,6 +18,8 @@ let formData = {
   publisher: '',
   dateAcquired: new Date().toISOString().split('T')[0],
   cost: '',
+  startingPage: '0',
+  finished: false,
 };
 
 if (Astro.request.method === 'POST') {
@@ -41,6 +43,8 @@ if (Astro.request.method === 'POST') {
         (data.get('dateAcquired') as string) ||
         new Date().toISOString().split('T')[0],
       cost: (data.get('cost') as string) || '',
+      startingPage: (data.get('startingPage') as string) || '0',
+      finished: data.get('finished') === 'true',
     };
 
     const book = {
@@ -57,6 +61,8 @@ if (Astro.request.method === 'POST') {
       dateAcquired: formData.dateAcquired,
       dateRemoved: null,
       cost: parseFloat(formData.cost) || 0,
+      startingPage: parseInt(formData.startingPage) || 0,
+      finished: formData.finished,
     };
 
     // Validate required fields
@@ -128,11 +134,8 @@ if (Astro.request.method === 'POST') {
             <option value="" selected={formData.format === ''}
               >Select a format</option
             >
-            <option value="Hardcover" selected={formData.format === 'Hardcover'}
-              >Hardcover</option
-            >
-            <option value="Paperback" selected={formData.format === 'Paperback'}
-              >Paperback</option
+            <option value="Physical" selected={formData.format === 'Physical'}
+              >Physical</option
             >
             <option value="E-book" selected={formData.format === 'E-book'}
               >E-book</option
@@ -268,6 +271,44 @@ if (Astro.request.method === 'POST') {
             class="form-input"
             value={formData.cost}
           />
+        </div>
+
+        <div>
+          <label for="startingPage" class="form-label">Starting Page</label>
+          <input
+            type="number"
+            id="startingPage"
+            name="startingPage"
+            min="0"
+            class="form-input"
+            value={formData.startingPage}
+          />
+        </div>
+
+        <div>
+          <label class="form-label mb-2">Finished</label>
+          <div class="flex items-center space-x-4">
+            <label class="inline-flex items-center">
+              <input
+                type="radio"
+                name="finished"
+                value="true"
+                class="form-radio"
+                checked={formData.finished}
+              />
+              <span class="ml-2">Yes</span>
+            </label>
+            <label class="inline-flex items-center">
+              <input
+                type="radio"
+                name="finished"
+                value="false"
+                class="form-radio"
+                checked={!formData.finished}
+              />
+              <span class="ml-2">No</span>
+            </label>
+          </div>
         </div>
       </div>
 

@@ -15,6 +15,8 @@ export const books = sqliteTable('books', {
   dateAcquired: text('date_acquired').notNull(), // ISO date string format
   dateRemoved: text('date_removed'),             // ISO date string format, optional
   cost: real('cost').notNull(),
+  startingPage: integer('starting_page').default(0).notNull(),
+  finished: integer('finished', { mode: 'boolean' }).default(false).notNull(),
 });
 
 export const readingSessions = sqliteTable('reading_sessions', {

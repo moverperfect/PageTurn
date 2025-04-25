@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import type { ReadingSession } from '../../../lib/schema';
-import { updateReadingSession, deleteReadingSession, getReadingSessionById } from '../../../lib/db';
+import { updateReadingSession, deleteReadingSession, getReadingSessionById, getBookById, updateBook } from '../../../lib/db';
 
 export const GET: APIRoute = async ({ params, locals }) => {
   const { id } = params;
@@ -65,6 +65,20 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
           }
         }
       );
+    }
+
+    // If the session was marked as finished, update the book's finished status
+    if (updates.finished === true) {
+      // Get the book
+      try {
+        const book = await getBookById(updatedSession.bookId, locals.runtime.env);
+        if (book && !book.finished) {
+          // Update the book's finished status
+          await updateBook(updatedSession.bookId, { finished: true }, locals.runtime.env);
+        }
+      } catch (error) {
+        console.error('Error updating book finished status:', error);
+      }
     }
 
     return new Response(

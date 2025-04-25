@@ -1,5 +1,5 @@
 // Types for our book and reading session data
-import { eq, and, ilike, sql } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { getDbClient } from './db-client';
 import { books, readingSessions, type Book, type ReadingSession } from './schema';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,19 +21,20 @@ export function calculateProgress(book: Book, sessions: ReadingSession[]): {
   estimatedHoursLeft: number;
 } {
   const bookSessions = sessions.filter(session => session.bookId === book.id);
-  const pagesRead = bookSessions.reduce((sum, session) => sum + session.pagesRead, 0);
-  const percentComplete = (pagesRead / book.pageCount) * 100;
+  const sessionPagesRead = bookSessions.reduce((sum, session) => sum + session.pagesRead, 0);
+  const totalPagesRead = sessionPagesRead + book.startingPage;
+  const percentComplete = (totalPagesRead / book.pageCount) * 100;
 
   const totalDurationSeconds = bookSessions.reduce((sum, session) => sum + session.duration, 0);
   const totalDurationMinutes = totalDurationSeconds / 60;
-  const minutesPerPage = pagesRead === 0 ? 0 : totalDurationMinutes / pagesRead;
-  const pagesPerHour = totalDurationMinutes === 0 ? 0 : pagesRead / (totalDurationMinutes / 60);
+  const minutesPerPage = sessionPagesRead === 0 ? 0 : totalDurationMinutes / sessionPagesRead;
+  const pagesPerHour = totalDurationMinutes === 0 ? 0 : sessionPagesRead / (totalDurationMinutes / 60);
 
-  const pagesLeft = book.pageCount - pagesRead;
+  const pagesLeft = book.pageCount - totalPagesRead;
   const estimatedHoursLeft = (pagesLeft * minutesPerPage) / 60;
 
   return {
-    pagesRead,
+    pagesRead: totalPagesRead,
     percentComplete,
     minutesPerPage,
     pagesPerHour,
@@ -307,9 +308,13 @@ export async function deleteReadingSession(id: string, env: Env): Promise<boolea
 }
 
 /**
- * Retrieves all books that are currently being read, based on reading sessions and total pages read.
+ * Retrieves all books that are currently being read, based on the finished flag and reading activity.
  *
- * @returns A promise that resolves to an array of books with ongoing reading sessions and unread pages remaining.
+ * A book is considered currently being read if:
+ * 1. It is not marked as finished
+ * 2. AND (it has at least one reading session OR its starting page is greater than 0)
+ *
+ * @returns A promise that resolves to an array of books that are in progress.
  *
  * @throws {Error} If the database query fails.
  */
@@ -317,21 +322,21 @@ export async function getCurrentlyReadingBooks(env: Env): Promise<Book[]> {
   try {
     const db = getDbClient(env);
 
-    // Use a combination of select and prepared statements for better performance
     return await db
       .select()
       .from(books)
       .where(
-        sql`EXISTS (
-          SELECT 1 
-          FROM ${readingSessions}
-          WHERE ${readingSessions.bookId} = ${books.id}
+        and(
+          eq(books.finished, false),
+          sql`(
+            EXISTS (
+              SELECT 1 
+              FROM ${readingSessions}
+              WHERE ${readingSessions.bookId} = ${books.id}
+            )
+            OR ${books.startingPage} > 0
+          )`
         )
-        AND (
-          SELECT COALESCE(SUM(${readingSessions.pagesRead}), 0)
-          FROM ${readingSessions}
-          WHERE ${readingSessions.bookId} = ${books.id}
-        ) < ${books.pageCount}`
       );
   } catch (error) {
     console.error('Error getting currently reading books:', error);
@@ -356,8 +361,8 @@ export async function getBookByTitleAndAuthor(title: string, author: string, env
       .from(books)
       .where(
         and(
-          ilike(books.title, title),
-          ilike(books.author, author)
+          sql`LOWER(${books.title}) = LOWER(${title})`,
+          sql`LOWER(${books.author}) = LOWER(${author})`
         )
       );
     return results[0];
