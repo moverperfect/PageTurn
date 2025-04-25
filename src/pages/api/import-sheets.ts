@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { addBook, addReadingSession, getBookByTitleAndAuthor } from '../../lib/db';
+import { addBook, addReadingSession, getBookByTitleAndAuthor, updateBook, getBookById } from '../../lib/db';
 import type { ReadingSession, Book } from '../../lib/schema';
 
 interface ImportRequestBody {
@@ -101,7 +101,13 @@ function convertToBooks(sheetData: any[]): Omit<Book, 'id'>[] {
       title: row.title,
       author: row.author,
       format: row.format,
-      pageCount: parseInt(row.pagecount) || 0,
+      pageCount: (() => {
+        const pc = Number.parseInt(row.pagecount);
+        if (Number.isNaN(pc)) {
+          throw new Error(`Invalid pageCount "${row.pagecount}"`);
+        }
+        return pc;
+      })(),
       isbn: row.isbn || '',
       authorSex: (row.authorsex as 'M' | 'F' | 'Other' | 'Unknown') || 'Unknown',
       recommended: row.recommended?.toLowerCase() === 'true' || false,
@@ -110,7 +116,9 @@ function convertToBooks(sheetData: any[]): Omit<Book, 'id'>[] {
       publisher: row.publisher || '',
       dateAcquired: row.dateacquired || new Date().toISOString(),
       dateRemoved: null,
-      cost: parseFloat(row.cost) || 0
+      cost: parseFloat(row.cost) || 0,
+      startingPage: parseInt(row.startingpage) || 0,
+      finished: row['finished?'] === 'Y' || false
     };
 
     return book;
@@ -138,9 +146,11 @@ function parseDuration(durationStr: string): number {
 }
 
 /**
- * Parses a date string in various formats and returns an ISO 8601 string.
+ * Parses a date string in UK format (DD/MM/YYYY) and returns an ISO 8601 string.
  *
- * Supports `dd/mm/yyyy` format by converting it to ISO format. Falls back to standard JavaScript date parsing for other formats. If parsing fails or the input is empty, returns the current date in ISO format.
+ * Treats dates with slashes as UK format DD/MM/YYYY by default.
+ * For dates that don't contain slashes, falls back to standard JavaScript date parsing.
+ * If parsing fails or the input is empty, returns the current date in ISO format.
  *
  * @param dateStr - The date string to parse.
  * @returns The parsed date as an ISO 8601 string.
@@ -148,12 +158,11 @@ function parseDuration(durationStr: string): number {
 function parseDate(dateStr: string): string {
   if (!dateStr) return new Date().toISOString();
 
-  // Try to detect if it's in dd/mm/yyyy format
+  // For dates with slashes, assume UK format (DD/MM/YYYY)
   if (dateStr.includes('/')) {
     const parts = dateStr.split('/');
-    // If it looks like dd/mm/yyyy format
-    if (parts.length === 3 && parts[0].length <= 2 && parts[1].length <= 2) {
-      // Convert to yyyy-mm-dd for parsing
+    if (parts.length === 3) {
+      // Convert from DD/MM/YYYY to YYYY-MM-DD for parsing
       const day = parts[0].padStart(2, '0');
       const month = parts[1].padStart(2, '0');
       const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
@@ -162,12 +171,22 @@ function parseDate(dateStr: string): string {
     }
   }
 
-  // Try standard JS date parsing
+  // Try standard JS date parsing for other formats
   try {
     return new Date(dateStr).toISOString();
   } catch (e) {
     console.error('Error parsing date:', dateStr);
     return new Date().toISOString();
+  }
+}
+
+// Function to update a book's startingPage value
+async function updateBookCurrentPage(bookId: string, startingPage: number, env: Env): Promise<void> {
+  try {
+    await updateBook(bookId, { startingPage }, env);
+  } catch (error) {
+    console.error(`Error updating startingPage for book ${bookId}:`, error);
+    throw error;
   }
 }
 
@@ -183,6 +202,12 @@ function parseDate(dateStr: string): string {
  * @throws {Error} If required fields are missing or if a referenced book cannot be found.
  */
 async function convertToReadingSessions(sheetData: any[], env: Env): Promise<Omit<ReadingSession, 'id'>[]> {
+  // Group sessions by book to track which is first
+  const sessionsByBook: Record<string, { session: Omit<ReadingSession, 'id'>, isFirst: boolean, startPage: number }[]> = {};
+  // Track books that need to be marked as finished
+  const booksToMarkFinished: Set<string> = new Set();
+
+  // First pass - create all sessions and group by book
   const sessionPromises = sheetData.map(async row => {
     // We need date and either (title + author) or (library book #)
     if (!row.date || ((!row.title || !row.author) && !row['library book #'])) {
@@ -191,8 +216,10 @@ async function convertToReadingSessions(sheetData: any[], env: Env): Promise<Omi
 
     // Find the book by title and author
     let bookId: string;
+    let book: Book | undefined;
+
     if (row.title && row.author) {
-      const book = await getBookByTitleAndAuthor(row.title, row.author, env);
+      book = await getBookByTitleAndAuthor(row.title, row.author, env);
       if (!book) {
         throw new Error(`Book not found: ${row.title} by ${row.author}`);
       }
@@ -200,10 +227,21 @@ async function convertToReadingSessions(sheetData: any[], env: Env): Promise<Omi
     } else {
       // Assuming library book # is the book ID
       bookId = row['library book #'];
+      book = await getBookById(bookId, env);
+      if (!book) {
+        throw new Error(`Book not found with ID: ${bookId}`);
+      }
     }
 
     // Parse pages read
     const pagesRead = parseInt(row['pages read'] || row.pagesread) || 0;
+
+    // Parse cumulative pages if available
+    const cumulativePages = parseInt(row['cum pages'] || row.cumulativepages) || 0;
+
+    // Calculate starting page if cumulative pages is provided
+    const rawStart = cumulativePages > 0 ? cumulativePages - pagesRead : 0;
+    const startPage = Math.max(rawStart, 0);
 
     // Parse duration - handle HH:MM:SS format - now returns seconds
     const duration = parseDuration(row.duration);
@@ -212,7 +250,13 @@ async function convertToReadingSessions(sheetData: any[], env: Env): Promise<Omi
     const date = parseDate(row.date);
 
     // Determine if book was finished
-    const finished = row.finished?.toLowerCase() === 'true' || false;
+    const finished = row['finished?'] === 'Y' || false;
+
+    // Check if this session completes the book
+    const reachesEnd = book.pageCount > 0 && cumulativePages >= book.pageCount;
+    if (finished || reachesEnd) {
+      booksToMarkFinished.add(bookId);
+    }
 
     // Create reading session object
     const session: Omit<ReadingSession, 'id'> = {
@@ -223,10 +267,58 @@ async function convertToReadingSessions(sheetData: any[], env: Env): Promise<Omi
       finished
     };
 
-    return session;
+    // Group sessions by book
+    if (!sessionsByBook[bookId]) {
+      sessionsByBook[bookId] = [];
+    }
+
+    // Add to the book's sessions array
+    sessionsByBook[bookId].push({
+      session,
+      isFirst: false, // Will set properly in second pass
+      startPage
+    });
+
+    return { session, bookId, startPage };
   });
 
-  return Promise.all(sessionPromises);
+  const sessionData = await Promise.all(sessionPromises);
+
+  // Second pass - identify first session for each book and update book's startingPage
+  for (const bookId in sessionsByBook) {
+    // Sort sessions by date
+    sessionsByBook[bookId].sort((a, b) =>
+      new Date(a.session.date).getTime() - new Date(b.session.date).getTime()
+    );
+
+    // Mark the earliest session as first
+    if (sessionsByBook[bookId].length > 0) {
+      sessionsByBook[bookId][0].isFirst = true;
+
+      // Update book's startingPage with the starting page of first session
+      const firstStartPage = sessionsByBook[bookId][0].startPage;
+      if (firstStartPage > 0) {
+        try {
+          await updateBookCurrentPage(bookId, firstStartPage, env);
+        } catch (error) {
+          console.error(`Failed to update startingPage for book ${bookId}:`, error);
+        }
+      }
+    }
+  }
+
+  // Update finished status for books
+  for (const bookId of booksToMarkFinished) {
+    try {
+      await updateBook(bookId, { finished: true }, env);
+      console.log(`Marked book ${bookId} as finished`);
+    } catch (error) {
+      console.error(`Failed to mark book ${bookId} as finished:`, error);
+    }
+  }
+
+  // Return all sessions
+  return sessionData.map(item => item.session);
 }
 
 export const POST: APIRoute = async ({ request, locals }) => {

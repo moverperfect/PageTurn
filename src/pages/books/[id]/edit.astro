@@ -13,7 +13,7 @@ if (!book) {
   return Astro.redirect('/books');
 }
 
-const formatOptions = ['Paperback', 'Hardcover', 'E-book', 'Audiobook'];
+const formatOptions = ['Physical', 'E-book', 'Audiobook'];
 // const genres = [
 //   'Fiction',
 //   'Non-fiction',
@@ -117,6 +117,18 @@ const formatOptions = ['Paperback', 'Hardcover', 'E-book', 'Audiobook'];
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
+          <label for="genre" class="form-label">Genre</label>
+          <input
+            type="text"
+            id="genre"
+            name="genre"
+            class="form-input"
+            value={book.genre}
+            required
+          />
+        </div>
+
+        <div>
           <label class="form-label mb-2">Recommended to me</label>
           <div class="flex items-center space-x-4">
             <label class="inline-flex items-center">
@@ -140,18 +152,6 @@ const formatOptions = ['Paperback', 'Hardcover', 'E-book', 'Audiobook'];
               <span class="ml-2">No</span>
             </label>
           </div>
-        </div>
-
-        <div>
-          <label for="genre" class="form-label">Genre</label>
-          <input
-            type="text"
-            id="genre"
-            name="genre"
-            class="form-input"
-            value={book.genre}
-            required
-          />
         </div>
       </div>
 
@@ -209,6 +209,46 @@ const formatOptions = ['Paperback', 'Hardcover', 'E-book', 'Audiobook'];
         </div>
       </div>
 
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label for="startingPage" class="form-label">Starting Page</label>
+          <input
+            type="number"
+            id="startingPage"
+            name="startingPage"
+            min="0"
+            class="form-input"
+            value={book.startingPage || 0}
+          />
+        </div>
+
+        <div>
+          <label class="form-label mb-2">Finished</label>
+          <div class="flex items-center space-x-4">
+            <label class="inline-flex items-center">
+              <input
+                type="radio"
+                name="finished"
+                value="true"
+                class="form-radio"
+                checked={book.finished}
+              />
+              <span class="ml-2">Yes</span>
+            </label>
+            <label class="inline-flex items-center">
+              <input
+                type="radio"
+                name="finished"
+                value="false"
+                class="form-radio"
+                checked={!book.finished}
+              />
+              <span class="ml-2">No</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <div class="flex justify-between">
         <a href={`/books/${id}`} class="btn-secondary">Cancel</a>
         <button type="submit" class="btn">Save Changes</button>
@@ -244,6 +284,8 @@ const formatOptions = ['Paperback', 'Hardcover', 'E-book', 'Audiobook'];
           dateAcquired: formData.get('dateAcquired') || '',
           dateRemoved: null,
           cost: formData.get('cost') ? parseFloat(formData.get('cost')) : 0,
+          startingPage: parseInt(formData.get('startingPage')) || 0,
+          finished: formData.get('finished') === 'true',
         };
 
         try {
