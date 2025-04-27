@@ -15,7 +15,6 @@
     "db:migrate:preview": "wrangler d1 migrations apply --env preview page-turn --remote"
   },
   "dependencies": {
-    "@astrojs/check": "^0.9.4",
     "@astrojs/cloudflare": "^12.5.0",
     "@libsql/client": "^0.15.4",
     "@tailwindcss/vite": "^4.1.4",
