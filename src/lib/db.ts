@@ -87,23 +87,22 @@ export function estimateFinishDate(book: Book, sessions: ReadingSession[]): Date
 }
 
 /**
- * Retrieves all books from the database.
+ * Retrieves all books in the database.
  *
- * @returns A promise that resolves to an array of all books.
+ * @returns A promise that resolves to an array of all {@link Book} objects.
  */
 export async function getAllBooks(env: Env): Promise<Book[]> {
   const db = getDbClient(env);
   return await db.select().from(books);
 }
 
-/** 
- * Retrieves all books for a specific user.
+/**
+ * Retrieves all books belonging to a specific user.
  *
- * @param userId - The ID of the user whose books are to be retrieved.
- * @param env - The environment object containing the database configuration.
- * @returns A promise that resolves to an array of all books for the specified user.
+ * @param userId - The unique identifier of the user whose books are being retrieved.
+ * @returns A promise that resolves to an array of books owned by the specified user.
  *
- * @throws {Error} If a database error occurs during retrieval.
+ * @throws {Error} If a database error occurs while retrieving the books.
  */
 export async function getAllBooksForUser(userId: string, env: Env): Promise<Book[]> {
   try {
@@ -217,12 +216,11 @@ export async function getAllReadingSessions(env: Env): Promise<ReadingSession[]>
   }
 }
 
-/** 
- * Retrieves all reading sessions for a specific user.
+/**
+ * Retrieves all reading sessions associated with a specific user.
  *
- * @param userId - The ID of the user whose reading sessions are to be fetched.
- * @param env - The environment object containing the database configuration.
- * @returns An array of {@link ReadingSession} objects for the specified user.
+ * @param userId - The unique identifier of the user.
+ * @returns An array of reading sessions belonging to the user.
  *
  * @throws {Error} If the database query fails.
  */
@@ -347,13 +345,12 @@ export async function deleteReadingSession(id: string, env: Env): Promise<boolea
 }
 
 /**
- * Retrieves all books that are currently being read, based on the finished flag and reading activity.
+ * Retrieves all books for a user that are currently being read.
  *
- * A book is considered currently being read if:
- * 1. It is not marked as finished
- * 2. AND (it has at least one reading session OR its starting page is greater than 0)
+ * A book is considered currently being read if it is not finished and either has at least one reading session or its starting page is greater than zero.
  *
- * @returns A promise that resolves to an array of books that are in progress.
+ * @param userId - The unique identifier of the user whose books are being queried.
+ * @returns A promise that resolves to an array of books in progress for the specified user.
  *
  * @throws {Error} If the database query fails.
  */
