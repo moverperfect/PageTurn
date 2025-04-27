@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { getDbClient } from "./db-client";
+import { oAuthProxy } from "better-auth/plugins";
 
 // Singleton auth client
 let authInstance: ReturnType<typeof betterAuth>;
@@ -19,6 +20,12 @@ export const auth = betterAuth({
       clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
     },
   },
+  plugins: [
+    oAuthProxy({
+      currentURL: process.env.CF_PAGES_URL,
+      productionURL: process.env.BETTER_AUTH_URL,
+    })
+  ]
 });
 
 /**
@@ -44,8 +51,15 @@ export function getAuth(env: Env) {
         github: {
           clientId: env.GITHUB_CLIENT_ID,
           clientSecret: env.GITHUB_CLIENT_SECRET,
+          redirectURI: `${env.BETTER_AUTH_URL}/api/auth/callback/github`
         },
       },
+      plugins: [
+        oAuthProxy({
+          currentURL: env.CF_PAGES_URL || env.BETTER_AUTH_URL,
+          productionURL: env.BETTER_AUTH_URL,
+        })
+      ]
     });
   }
   return authInstance;
