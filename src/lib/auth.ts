@@ -29,14 +29,14 @@ export const auth = betterAuth({
 });
 
 /**
- * Retrieves the singleton authentication client configured with the provided environment.
+ * Returns a singleton authentication client configured with the provided environment.
  *
- * Initializes the authentication instance with a Drizzle adapter and GitHub OAuth credentials from {@link env} if it has not been created yet. Subsequent calls return the same instance.
+ * Initializes the authentication client with a Drizzle adapter, GitHub OAuth credentials, a redirect URI, and the oAuthProxy plugin using environment variables. Subsequent calls return the same instance.
  *
- * @param env - Environment object containing GitHub OAuth credentials and database configuration.
- * @returns The singleton authentication client instance.
+ * @param env - Environment object containing GitHub OAuth credentials, database configuration, and URLs for OAuth proxying.
+ * @returns The initialized authentication client instance.
  *
- * @throws {Error} If {@link env.GITHUB_CLIENT_ID} or {@link env.GITHUB_CLIENT_SECRET} is missing.
+ * @throws {Error} If GitHub OAuth credentials are missing from {@link env}.
  */
 export function getAuth(env: Env) {
   if (!authInstance) {
