@@ -1,17 +1,25 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import {
-  getCurrentlyReadingBooks,
   calculateProgress,
   estimateFinishDate,
-  getAllReadingSessions,
+  getAllReadingSessionsForUser,
+  getCurrentlyReadingBooksForUser,
 } from '../lib/db';
 
-// Get currently reading books
-const currentlyReadingBooks = await getCurrentlyReadingBooks(
+const userId = Astro.locals.session?.User?.id;
+
+if (!userId) {
+  throw new Error('Unauthenticated access to index.astro');
+}
+const currentlyReadingBooks = await getCurrentlyReadingBooksForUser(
+  userId,
   Astro.locals.runtime.env
 );
-const allSessions = await getAllReadingSessions(Astro.locals.runtime.env);
+const allSessions = await getAllReadingSessionsForUser(
+  userId,
+  Astro.locals.runtime.env
+);
 
 // Calculate statistics for each book
 const booksWithStats = currentlyReadingBooks.map((book) => {

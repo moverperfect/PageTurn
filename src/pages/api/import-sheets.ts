@@ -48,12 +48,10 @@ async function fetchSheetData(sheetId: string, sheetName: string = 'Sheet1'): Pr
 }
 
 /**
- * Parses CSV text into a two-dimensional array of strings.
- *
- * Handles quoted fields, embedded commas, escaped quotes, and normalizes line endings.
+ * Parses CSV-formatted text into an array of rows, handling quoted fields, embedded commas, and escaped quotes.
  *
  * @param text - The CSV-formatted string to parse.
- * @returns An array of rows, each row being an array of field values.
+ * @returns An array of rows, where each row is an array of field values.
  */
 function parseCSV(text: string): string[][] {
   const lines = text.replace(/\r\n?/g, '\n').split('\n');
@@ -88,8 +86,17 @@ function parseCSV(text: string): string[][] {
   }).filter(line => line.length > 0 && line[0] !== '');
 }
 
-// Convert sheet data to Book objects
-function convertToBooks(sheetData: any[]): Omit<Book, 'id'>[] {
+/**
+ * Converts parsed sheet data rows into book objects, omitting `id` and `userId`.
+ *
+ * Validates the presence of required fields (`title`, `author`, `format`, `pagecount`) and parses numeric fields with error handling. Optional fields are set to defaults if missing.
+ *
+ * @param sheetData - Array of row objects from the parsed sheet, with lowercase keys.
+ * @returns An array of book objects ready for database insertion, excluding `id` and `userId`.
+ *
+ * @throws {Error} If a row is missing required fields or contains invalid numeric values.
+ */
+function convertToBooks(sheetData: any[]): Omit<Book, 'id' | 'userId'>[] {
   return sheetData.map(row => {
     // Handle required fields - using lowercase keys for case insensitivity
     if (!row.title || !row.author || !row.format || !row.pagecount) {
@@ -97,7 +104,7 @@ function convertToBooks(sheetData: any[]): Omit<Book, 'id'>[] {
     }
 
     // Create book object with defaults for optional fields
-    const book: Omit<Book, 'id'> = {
+    const book: Omit<Book, 'id' | 'userId'> = {
       title: row.title,
       author: row.author,
       format: row.format,
@@ -191,17 +198,18 @@ async function updateBookCurrentPage(bookId: string, startingPage: number, env: 
 }
 
 /**
- * Converts raw sheet data into an array of reading session objects, resolving book references asynchronously.
+ * Converts sheet data rows into reading session objects, resolving book references and associating each session with a user.
  *
- * Each row must include a date and either a title with author or a library book number. If a title and author are provided, the corresponding book is looked up in the database; otherwise, the library book number is used as the book ID. Parses and normalizes fields such as pages read, duration (in seconds), date, and finished status.
+ * Each row must include a date and either a title with author or a library book number. Book references are resolved via database lookups. Fields such as pages read, cumulative pages, duration, date, and finished status are parsed and normalized. The function updates each book's starting page based on the earliest session and marks books as finished if indicated by the session data.
  *
  * @param sheetData - Array of objects representing rows from the sheet.
- * @param env - Environment context used for database lookups.
- * @returns A promise that resolves to an array of reading session objects without IDs.
+ * @param env - Environment context for database operations.
+ * @param userId - The ID of the user to associate with each reading session.
+ * @returns A promise resolving to an array of reading session objects without IDs.
  *
  * @throws {Error} If required fields are missing or if a referenced book cannot be found.
  */
-async function convertToReadingSessions(sheetData: any[], env: Env): Promise<Omit<ReadingSession, 'id'>[]> {
+async function convertToReadingSessions(sheetData: any[], env: Env, userId: string): Promise<Omit<ReadingSession, 'id'>[]> {
   // Group sessions by book to track which is first
   const sessionsByBook: Record<string, { session: Omit<ReadingSession, 'id'>, isFirst: boolean, startPage: number }[]> = {};
   // Track books that need to be marked as finished
@@ -264,7 +272,8 @@ async function convertToReadingSessions(sheetData: any[], env: Env): Promise<Omi
       bookId,
       pagesRead,
       duration,
-      finished
+      finished,
+      userId
     };
 
     // Group sessions by book
@@ -340,9 +349,17 @@ export const POST: APIRoute = async ({ request, locals }) => {
       // Convert to Book objects
       const books = convertToBooks(sheetData);
 
+      // Verify that user is authenticated
+      if (!locals.session?.User?.id) {
+        throw new Error('User must be authenticated to import books');
+      }
+
       // Add books to the database
       // Create an array of promises for adding books
-      const bookPromises = books.map(bookData => addBook(bookData, locals.runtime.env));
+      const bookPromises = books.map(bookData => {
+        // Ensure userId is included in the book data
+        return addBook({ ...bookData, userId: locals.session.User.id }, locals.runtime.env);
+      });
 
       // Wait for all books to be added
       const addedBooks = await Promise.all(bookPromises);
@@ -357,7 +374,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
       );
     } else if (type === 'sessions') {
       // Convert to ReadingSession objects
-      const sessions = await convertToReadingSessions(sheetData, locals.runtime.env);
+      if (!locals.session?.User?.id) {
+        throw new Error('User must be authenticated to import reading sessions');
+      }
+      const sessions = await convertToReadingSessions(
+        sheetData,
+        locals.runtime.env,
+        locals.session.User.id
+      );
 
       // Add sessions to the database
       // Create an array of promises for adding sessions

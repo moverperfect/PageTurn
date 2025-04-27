@@ -1,8 +1,8 @@
 import type { APIRoute } from 'astro';
-import { getCurrentlyReadingBooks } from '../../../lib/db';
+import { getCurrentlyReadingBooksForUser } from '../../../lib/db';
 
 export const GET: APIRoute = async ({ locals }) => {
-  const currentlyReading = await getCurrentlyReadingBooks(locals.runtime.env);
+  const currentlyReading = await getCurrentlyReadingBooksForUser(locals.session.User.id, locals.runtime.env);
 
   return new Response(
     JSON.stringify(currentlyReading),
