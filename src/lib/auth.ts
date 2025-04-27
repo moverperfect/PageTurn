@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { getDbClient } from "./db-client";
+import { oAuthProxy } from "better-auth/plugins";
 
 // Singleton auth client
 let authInstance: ReturnType<typeof betterAuth>;
@@ -19,17 +20,23 @@ export const auth = betterAuth({
       clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
     },
   },
+  plugins: [
+    oAuthProxy({
+      currentURL: process.env.CF_PAGES_URL,
+      productionURL: process.env.BETTER_AUTH_URL,
+    })
+  ]
 });
 
 /**
- * Retrieves the singleton authentication client configured with the provided environment.
+ * Returns a singleton authentication client configured with the provided environment.
  *
- * Initializes the authentication instance with a Drizzle adapter and GitHub OAuth credentials from {@link env} if it has not been created yet. Subsequent calls return the same instance.
+ * Initializes the authentication client with a Drizzle adapter, GitHub OAuth credentials, a redirect URI, and the oAuthProxy plugin using environment variables. Subsequent calls return the same instance.
  *
- * @param env - Environment object containing GitHub OAuth credentials and database configuration.
- * @returns The singleton authentication client instance.
+ * @param env - Environment object containing GitHub OAuth credentials, database configuration, and URLs for OAuth proxying.
+ * @returns The initialized authentication client instance.
  *
- * @throws {Error} If {@link env.GITHUB_CLIENT_ID} or {@link env.GITHUB_CLIENT_SECRET} is missing.
+ * @throws {Error} If GitHub OAuth credentials are missing from {@link env}.
  */
 export function getAuth(env: Env) {
   if (!authInstance) {
@@ -44,8 +51,15 @@ export function getAuth(env: Env) {
         github: {
           clientId: env.GITHUB_CLIENT_ID,
           clientSecret: env.GITHUB_CLIENT_SECRET,
+          redirectURI: `${env.BETTER_AUTH_URL}/api/auth/callback/github`
         },
       },
+      plugins: [
+        oAuthProxy({
+          currentURL: env.CF_PAGES_URL || env.BETTER_AUTH_URL,
+          productionURL: env.BETTER_AUTH_URL,
+        })
+      ]
     });
   }
   return authInstance;
