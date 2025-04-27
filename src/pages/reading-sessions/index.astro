@@ -1,8 +1,15 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { getAllReadingSessions, getBookById } from '../../lib/db';
+import { getAllReadingSessionsForUser, getBookById } from '../../lib/db';
 
-const sessions = await getAllReadingSessions(Astro.locals.runtime.env);
+const userId = Astro.locals.session?.User?.id;
+if (!userId) {
+  throw new Error('User not authenticated');
+}
+const sessions = await getAllReadingSessionsForUser(
+  userId,
+  Astro.locals.runtime.env
+);
 
 // Format seconds to HH:MM:SS
 function formatDuration(seconds: number): string {

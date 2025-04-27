@@ -96,6 +96,25 @@ export async function getAllBooks(env: Env): Promise<Book[]> {
   return await db.select().from(books);
 }
 
+/** 
+ * Retrieves all books for a specific user.
+ *
+ * @param userId - The ID of the user whose books are to be retrieved.
+ * @param env - The environment object containing the database configuration.
+ * @returns A promise that resolves to an array of all books for the specified user.
+ *
+ * @throws {Error} If a database error occurs during retrieval.
+ */
+export async function getAllBooksForUser(userId: string, env: Env): Promise<Book[]> {
+  try {
+    const db = getDbClient(env);
+    return await db.select().from(books).where(eq(books.userId, userId));
+  } catch (error) {
+    console.error('Error getting all books for user:', error);
+    throw new Error(`Failed to get all books for user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
 /**
  * Retrieves a book by its unique ID.
  *
@@ -197,6 +216,26 @@ export async function getAllReadingSessions(env: Env): Promise<ReadingSession[]>
     throw new Error(`Failed to get all reading sessions: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
+
+/** 
+ * Retrieves all reading sessions for a specific user.
+ *
+ * @param userId - The ID of the user whose reading sessions are to be fetched.
+ * @param env - The environment object containing the database configuration.
+ * @returns An array of {@link ReadingSession} objects for the specified user.
+ *
+ * @throws {Error} If the database query fails.
+ */
+export async function getAllReadingSessionsForUser(userId: string, env: Env): Promise<ReadingSession[]> {
+  try {
+    const db = getDbClient(env);
+    return await db.select().from(readingSessions).where(eq(readingSessions.userId, userId));
+  } catch (error) {
+    console.error('Error getting all reading sessions for user:', error);
+    throw new Error(`Failed to get all reading sessions for user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
 
 /**
  * Retrieves all reading sessions associated with a specific book.
@@ -318,7 +357,7 @@ export async function deleteReadingSession(id: string, env: Env): Promise<boolea
  *
  * @throws {Error} If the database query fails.
  */
-export async function getCurrentlyReadingBooks(env: Env): Promise<Book[]> {
+export async function getCurrentlyReadingBooksForUser(userId: string, env: Env): Promise<Book[]> {
   try {
     const db = getDbClient(env);
 
@@ -328,14 +367,15 @@ export async function getCurrentlyReadingBooks(env: Env): Promise<Book[]> {
       .where(
         and(
           eq(books.finished, false),
+          eq(books.userId, userId),
           sql`(
-            EXISTS (
-              SELECT 1 
-              FROM ${readingSessions}
-              WHERE ${readingSessions.bookId} = ${books.id}
-            )
-            OR ${books.startingPage} > 0
-          )`
+              EXISTS (
+                SELECT 1 
+                FROM ${readingSessions}
+                WHERE ${readingSessions.bookId} = ${books.id}
+              )
+              OR ${books.startingPage} > 0
+            )`
         )
       );
   } catch (error) {

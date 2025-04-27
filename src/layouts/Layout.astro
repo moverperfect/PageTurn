@@ -6,6 +6,10 @@ interface Props {
 }
 
 const { title = 'PageTurn' } = Astro.props;
+
+// Get user session
+let session = Astro.locals.session;
+const isLoggedIn = !!session?.User;
 ---
 
 <!doctype html>
@@ -29,16 +33,13 @@ const { title = 'PageTurn' } = Astro.props;
       <div class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <div
           class="absolute -top-40 -right-40 w-80 h-80 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10"
-        >
-        </div>
+        ></div>
         <div
           class="absolute top-1/3 left-0 w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10"
-        >
-        </div>
+        ></div>
         <div
           class="absolute -bottom-40 right-1/4 w-80 h-80 bg-indigo-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10"
-        >
-        </div>
+        ></div>
       </div>
 
       <header
@@ -49,20 +50,16 @@ const { title = 'PageTurn' } = Astro.props;
             <a
               href="/"
               class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 text-transparent bg-clip-text"
-              >PageTurn</a
             >
-            <nav>
-              <ul class="flex space-x-6">
+              PageTurn
+            </a>
+            <nav class="flex items-center">
+              <ul class="flex space-x-6 mr-4">
                 <li>
-                  <a href="/" class="hover:text-indigo-400 transition-colors"
-                    >Home</a
-                  >
+                  <a href="/" class="hover:text-indigo-400 transition-colors">Home</a>
                 </li>
                 <li>
-                  <a
-                    href="/books"
-                    class="hover:text-indigo-400 transition-colors">Library</a
-                  >
+                  <a href="/books" class="hover:text-indigo-400 transition-colors">Library</a>
                 </li>
                 <li>
                   <a
@@ -72,19 +69,60 @@ const { title = 'PageTurn' } = Astro.props;
                   >
                 </li>
                 <li>
-                  <a
-                    href="/stats"
-                    class="hover:text-indigo-400 transition-colors"
-                    >Statistics</a
-                  >
+                  <a href="/stats" class="hover:text-indigo-400 transition-colors">Statistics</a>
                 </li>
                 <li>
-                  <a
-                    href="/import"
-                    class="hover:text-indigo-400 transition-colors">Import</a
-                  >
+                  <a href="/import" class="hover:text-indigo-400 transition-colors">Import</a>
                 </li>
               </ul>
+              
+              {isLoggedIn ? (
+                <div class="relative dropdown-container">
+                  <input type="checkbox" id="profile-checkbox" class="peer hidden" />
+                  <label 
+                    for="profile-checkbox" 
+                    class="flex items-center cursor-pointer p-1.5 rounded-full hover:bg-slate-800 transition-colors"
+                  >
+                    {session.User.image ? (
+                      <img
+                        src={session.User.image}
+                        alt="Profile"
+                        class="w-8 h-8 rounded-full border border-slate-600"
+                      />
+                    ) : (
+                      <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white">
+                        {session.User.name?.charAt(0) || session.User.email?.charAt(0) || "?"}
+                      </div>
+                    )}
+                  </label>
+                  
+                  <!-- Menu that shows when checkbox is checked -->
+                  <div 
+                    class="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-xl border border-slate-700 z-50
+                           scale-0 origin-top-right peer-checked:scale-100 transition-transform"
+                  >
+                    <div class="px-4 py-2 border-b border-slate-700">
+                      <p class="font-medium text-sm text-white truncate">{session.User.name || "User"}</p>
+                      <p class="text-xs text-slate-400 truncate">{session.User.email}</p>
+                    </div>
+                    <a
+                      href="/profile"
+                      class="block px-4 py-2 text-sm hover:bg-slate-700 transition-colors"
+                      >Profile</a
+                    >
+                    <button
+                      id="logout-btn"
+                      class="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-slate-700 transition-colors"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <a href="/login" class="btn-secondary text-sm">
+                  Sign In
+                </a>
+              )}
             </nav>
           </div>
         </div>
@@ -104,48 +142,81 @@ const { title = 'PageTurn' } = Astro.props;
         </div>
       </footer>
     </div>
-  </body>
+
+    <style>
+      html {
+        font-family: 'Inter', sans-serif;
+        scrollbar-color: rgba(99, 102, 241, 0.5) rgba(15, 23, 42, 0.1);
+        scrollbar-width: thin;
+      }
+
+      body {
+        transition: opacity 0.15s ease-in-out;
+      }
+
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: rgba(15, 23, 42, 0.1);
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: rgba(99, 102, 241, 0.5);
+        border-radius: 4px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(99, 102, 241, 0.7);
+      }
+    </style>
+
+    <script>
+      import { authClient } from '../lib/auth-client.js';
+
+      // Prevent white flash during page transitions
+      document.addEventListener('astro:before-preparation', () => {
+        document.documentElement.style.scrollBehavior = 'auto';
+        document.body.style.opacity = '0.5';
+      });
+
+      document.addEventListener('astro:page-load', () => {
+        document.body.style.opacity = '1';
+        document.documentElement.style.scrollBehavior = 'smooth';
+      });
+      
+      // Click-outside handler for the profile dropdown
+      const checkbox = document.getElementById('profile-checkbox');
+      const container = document.querySelector('.dropdown-container');
+      if (checkbox && container) {
+        document.addEventListener('click', (e) => {
+          if (
+            (checkbox as HTMLInputElement).checked &&
+            !container.contains(e.target as Node) &&
+            e.target !== checkbox
+          ) {
+            (checkbox as HTMLInputElement).checked = false;
+          }
+        });
+      }
+
+      // Logout button
+      const logoutBtn = document.getElementById('logout-btn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+          try {
+            authClient.signOut()
+              .catch(error => {
+                console.error('Failed to sign out:', error);
+                alert('Failed to sign out');
+              });
+          } catch (error) {
+            console.error('Error importing auth client:', error);
+          }
+        });
+      }
+    </script>
+  </body> 
 </html>
-
-<style>
-  html {
-    font-family: 'Inter', sans-serif;
-    scrollbar-color: rgba(99, 102, 241, 0.5) rgba(15, 23, 42, 0.1);
-    scrollbar-width: thin;
-  }
-
-  body {
-    transition: opacity 0.15s ease-in-out;
-  }
-
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: rgba(15, 23, 42, 0.1);
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: rgba(99, 102, 241, 0.5);
-    border-radius: 4px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(99, 102, 241, 0.7);
-  }
-</style>
-
-<script is:inline>
-  // Prevent white flash during page transitions
-  document.addEventListener('astro:before-preparation', () => {
-    document.documentElement.style.scrollBehavior = 'auto';
-    document.body.style.opacity = '0.5';
-  });
-
-  document.addEventListener('astro:page-load', () => {
-    document.body.style.opacity = '1';
-    document.documentElement.style.scrollBehavior = 'smooth';
-  });
-</script>

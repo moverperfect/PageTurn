@@ -1,8 +1,11 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { getAllBooks } from '../../lib/db';
+import { getAllBooksForUser } from '../../lib/db';
 
-const books = await getAllBooks(Astro.locals.runtime.env);
+const books = await getAllBooksForUser(
+  Astro.locals.session.User.id,
+  Astro.locals.runtime.env
+);
 ---
 
 <Layout title="My Library | PageTurn">

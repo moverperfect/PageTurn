@@ -1,9 +1,13 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { getAllBooks, getAllReadingSessions, getBookById } from '../lib/db';
+import { getAllBooksForUser, getAllReadingSessionsForUser, getBookById } from '../lib/db';
 
-const books = await getAllBooks(Astro.locals.runtime.env);
-const sessions = await getAllReadingSessions(Astro.locals.runtime.env);
+const userId = Astro.locals.session?.User?.id;
+if (!userId) {
+  throw new Error('User not authenticated');
+}
+const books = await getAllBooksForUser(userId, Astro.locals.runtime.env);
+const sessions = await getAllReadingSessionsForUser(userId, Astro.locals.runtime.env);
 
 // Calculate overall stats
 const totalBooks = books.length;

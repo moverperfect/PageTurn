@@ -89,7 +89,7 @@ function parseCSV(text: string): string[][] {
 }
 
 // Convert sheet data to Book objects
-function convertToBooks(sheetData: any[]): Omit<Book, 'id'>[] {
+function convertToBooks(sheetData: any[]): Omit<Book, 'id' | 'userId'>[] {
   return sheetData.map(row => {
     // Handle required fields - using lowercase keys for case insensitivity
     if (!row.title || !row.author || !row.format || !row.pagecount) {
@@ -97,7 +97,7 @@ function convertToBooks(sheetData: any[]): Omit<Book, 'id'>[] {
     }
 
     // Create book object with defaults for optional fields
-    const book: Omit<Book, 'id'> = {
+    const book: Omit<Book, 'id' | 'userId'> = {
       title: row.title,
       author: row.author,
       format: row.format,
@@ -201,7 +201,7 @@ async function updateBookCurrentPage(bookId: string, startingPage: number, env: 
  *
  * @throws {Error} If required fields are missing or if a referenced book cannot be found.
  */
-async function convertToReadingSessions(sheetData: any[], env: Env): Promise<Omit<ReadingSession, 'id'>[]> {
+async function convertToReadingSessions(sheetData: any[], env: Env, userId: string): Promise<Omit<ReadingSession, 'id'>[]> {
   // Group sessions by book to track which is first
   const sessionsByBook: Record<string, { session: Omit<ReadingSession, 'id'>, isFirst: boolean, startPage: number }[]> = {};
   // Track books that need to be marked as finished
@@ -264,7 +264,8 @@ async function convertToReadingSessions(sheetData: any[], env: Env): Promise<Omi
       bookId,
       pagesRead,
       duration,
-      finished
+      finished,
+      userId
     };
 
     // Group sessions by book
@@ -340,9 +341,17 @@ export const POST: APIRoute = async ({ request, locals }) => {
       // Convert to Book objects
       const books = convertToBooks(sheetData);
 
+      // Verify that user is authenticated
+      if (!locals.session?.User?.id) {
+        throw new Error('User must be authenticated to import books');
+      }
+
       // Add books to the database
       // Create an array of promises for adding books
-      const bookPromises = books.map(bookData => addBook(bookData, locals.runtime.env));
+      const bookPromises = books.map(bookData => {
+        // Ensure userId is included in the book data
+        return addBook({ ...bookData, userId: locals.session.User.id }, locals.runtime.env);
+      });
 
       // Wait for all books to be added
       const addedBooks = await Promise.all(bookPromises);
@@ -357,7 +366,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
       );
     } else if (type === 'sessions') {
       // Convert to ReadingSession objects
-      const sessions = await convertToReadingSessions(sheetData, locals.runtime.env);
+      if (!locals.session?.User?.id) {
+        throw new Error('User must be authenticated to import reading sessions');
+      }
+      const sessions = await convertToReadingSessions(
+        sheetData,
+        locals.runtime.env,
+        locals.session.User.id
+      );
 
       // Add sessions to the database
       // Create an array of promises for adding sessions

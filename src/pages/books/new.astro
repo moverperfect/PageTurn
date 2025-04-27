@@ -78,7 +78,13 @@ if (Astro.request.method === 'POST') {
       return;
     }
 
-    await addBook(book, Astro.locals.runtime.env);
+    if (!Astro.locals.session?.User?.id) {
+      throw new Error('User not authenticated');
+    }
+    await addBook(
+      { ...book, userId: Astro.locals.session.User.id },
+      Astro.locals.runtime.env
+    );
     return Astro.redirect('/books');
   } catch (error) {
     console.error('Error adding book:', error);

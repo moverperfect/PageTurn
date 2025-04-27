@@ -21,6 +21,7 @@
     "@tailwindcss/vite": "^4.1.4",
     "@types/uuid": "^10.0.0",
     "astro": "^5.7.4",
+    "better-auth": "^1.2.7",
     "drizzle-orm": "^0.42.0",
     "uuid": "^11.1.0"
   },
