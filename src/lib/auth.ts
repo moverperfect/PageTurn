@@ -22,13 +22,14 @@ export const auth = betterAuth({
 });
 
 /**
- * Returns the singleton auth instance for the application.
- * 
- * If the instance has not been initialized, it creates a new instance using the provided 
- * environment and caches it for future use.
- * 
- * @param env - The environment object containing the database configuration
- * @returns The singleton auth instance
+ * Retrieves the singleton authentication client configured with the provided environment.
+ *
+ * Initializes the authentication instance with a Drizzle adapter and GitHub OAuth credentials from {@link env} if it has not been created yet. Subsequent calls return the same instance.
+ *
+ * @param env - Environment object containing GitHub OAuth credentials and database configuration.
+ * @returns The singleton authentication client instance.
+ *
+ * @throws {Error} If {@link env.GITHUB_CLIENT_ID} or {@link env.GITHUB_CLIENT_SECRET} is missing.
  */
 export function getAuth(env: Env) {
   if (!authInstance) {
