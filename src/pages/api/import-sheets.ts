@@ -121,7 +121,7 @@ function convertToBooks(sheetData: any[]): Omit<Book, 'id' | 'userId'>[] {
       genre: row.genre || '',
       publishedYear: parseInt(row.publishedyear) || 0,
       publisher: row.publisher || '',
-      dateAcquired: row.dateacquired || new Date().toISOString(),
+      dateAcquired: parseDate(row.dateacquired) || new Date().toISOString(),
       dateRemoved: null,
       cost: parseFloat(row.cost) || 0,
       startingPage: parseInt(row.startingpage) || 0,
