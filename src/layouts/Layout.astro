@@ -8,6 +8,11 @@ interface Props {
 const { title = 'PageTurn' } = Astro.props;
 const session = Astro.locals.session;
 const isLoggedIn = !!session?.User;
+
+let googleClientId;
+if (!isLoggedIn) {
+  googleClientId = Astro.locals.runtime.env.GOOGLE_CLIENT_ID;
+}
 ---
 
 <!doctype html>
@@ -194,12 +199,20 @@ const isLoggedIn = !!session?.User;
         background: rgba(99, 102, 241, 0.7);
       }
     </style>
-
+    {
+      !isLoggedIn ? (
+        /* prettier-ignore */
+        <div id="client-id" class="hidden">{googleClientId}</div>
+      ) : (
+        ''
+      )
+    }
     <script>
-      import { authClient } from '../lib/auth-client.js';
+      import { createAuthClient } from 'better-auth/client';
+      import { oneTapClient } from 'better-auth/client/plugins';
 
       // Initialize dropdown functionality
-      function setupProfileDropdown() {
+      async function setupProfileDropdown() {
         const profileButton = document.getElementById('profile-button');
         const profileMenu = document.getElementById('profile-menu');
 
@@ -227,20 +240,38 @@ const isLoggedIn = !!session?.User;
           });
         }
 
+        const googleClientId =
+          document.getElementById('client-id')?.textContent;
+
+        if (googleClientId != null) {
+          window.PageTurnAuthClient = createAuthClient({
+            plugins: [
+              oneTapClient({
+                clientId: googleClientId,
+              }),
+            ],
+          });
+        } else {
+          window.PageTurnAuthClient = createAuthClient();
+        }
+
         // Setup logout functionality
         const logoutBtn = document.getElementById('logout-btn');
         if (logoutBtn) {
           logoutBtn.addEventListener('click', async () => {
             try {
-              await authClient.signOut();
+              await window.PageTurnAuthClient.signOut();
               window.location.href = '/login';
             } catch (error) {
               console.error('Failed to sign out:', error);
             }
           });
         }
-      }
 
+        if (googleClientId != null) {
+          await window.PageTurnAuthClient.oneTap();
+        }
+      }
       setupProfileDropdown();
     </script>
   </body>

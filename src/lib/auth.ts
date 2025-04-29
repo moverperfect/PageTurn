@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { getDbClient } from "./db-client";
-import { oAuthProxy } from "better-auth/plugins";
+import { oAuthProxy, oneTap } from "better-auth/plugins";
 
 // Singleton auth client
 let authInstance: ReturnType<typeof betterAuth>;
@@ -53,12 +53,17 @@ export function getAuth(env: Env) {
           clientSecret: env.GITHUB_CLIENT_SECRET,
           redirectURI: `${env.BETTER_AUTH_URL}/api/auth/callback/github`
         },
+        google: {
+          clientId: env.GOOGLE_CLIENT_ID,
+          clientSecret: env.GOOGLE_CLIENT_SECRET,
+        }
       },
       plugins: [
         oAuthProxy({
           currentURL: env.CF_PAGES_URL || env.BETTER_AUTH_URL,
           productionURL: env.BETTER_AUTH_URL,
-        })
+        }),
+        oneTap()
       ]
     });
   }
