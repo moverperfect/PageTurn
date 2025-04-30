@@ -87,9 +87,9 @@ function parseCSV(text: string): string[][] {
 }
 
 /**
- * Converts parsed sheet data rows into book objects, omitting `id` and `userId`.
+ * Converts parsed sheet data rows into book objects for database insertion, omitting `id` and `userId`.
  *
- * Validates the presence of required fields (`title`, `author`, `format`, `pagecount`) and parses numeric fields with error handling. Optional fields are set to defaults if missing.
+ * Validates that each row contains the required fields: `title`, `author`, `format`, and `pagecount`. Parses numeric fields and assigns default values to optional fields if missing. Dates are standardized to ISO 8601 format.
  *
  * @param sheetData - Array of row objects from the parsed sheet, with lowercase keys.
  * @returns An array of book objects ready for database insertion, excluding `id` and `userId`.
@@ -121,7 +121,7 @@ function convertToBooks(sheetData: any[]): Omit<Book, 'id' | 'userId'>[] {
       genre: row.genre || '',
       publishedYear: parseInt(row.publishedyear) || 0,
       publisher: row.publisher || '',
-      dateAcquired: row.dateacquired || new Date().toISOString(),
+      dateAcquired: parseDate(row.dateacquired) || new Date().toISOString(),
       dateRemoved: null,
       cost: parseFloat(row.cost) || 0,
       startingPage: parseInt(row.startingpage) || 0,

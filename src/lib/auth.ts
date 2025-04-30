@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { getDbClient } from "./db-client";
-import { oAuthProxy } from "better-auth/plugins";
+import { oAuthProxy, oneTap } from "better-auth/plugins";
 
 // Singleton auth client
 let authInstance: ReturnType<typeof betterAuth>;
@@ -29,19 +29,22 @@ export const auth = betterAuth({
 });
 
 /**
- * Returns a singleton authentication client configured with the provided environment.
+ * Returns a singleton authentication client configured with OAuth providers and plugins based on the given environment.
  *
- * Initializes the authentication client with a Drizzle adapter, GitHub OAuth credentials, a redirect URI, and the oAuthProxy plugin using environment variables. Subsequent calls return the same instance.
+ * Initializes the authentication client with a Drizzle adapter, GitHub and Google OAuth credentials, redirect URIs, and the oAuthProxy and oneTap plugins using environment variables. Ensures only one instance is created per process.
  *
- * @param env - Environment object containing GitHub OAuth credentials, database configuration, and URLs for OAuth proxying.
+ * @param env - Environment object containing OAuth credentials, database configuration, and URLs for authentication.
  * @returns The initialized authentication client instance.
  *
- * @throws {Error} If GitHub OAuth credentials are missing from {@link env}.
+ * @throws {Error} If GitHub or Google OAuth credentials are missing from {@link env}.
  */
 export function getAuth(env: Env) {
   if (!authInstance) {
     if (!env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET) {
       throw new Error('Missing GitHub OAuth credentials in environment variables');
+    }
+    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+      throw new Error('Missing Google OAuth credentials in environment variables');
     }
     authInstance = betterAuth({
       database: drizzleAdapter(getDbClient(env), {
@@ -53,12 +56,18 @@ export function getAuth(env: Env) {
           clientSecret: env.GITHUB_CLIENT_SECRET,
           redirectURI: `${env.BETTER_AUTH_URL}/api/auth/callback/github`
         },
+        google: {
+          clientId: env.GOOGLE_CLIENT_ID,
+          clientSecret: env.GOOGLE_CLIENT_SECRET,
+          redirectURI: `${env.BETTER_AUTH_URL}/api/auth/callback/google`
+        }
       },
       plugins: [
         oAuthProxy({
           currentURL: env.CF_PAGES_URL || env.BETTER_AUTH_URL,
           productionURL: env.BETTER_AUTH_URL,
-        })
+        }),
+        oneTap()
       ]
     });
   }

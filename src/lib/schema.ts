@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
 
 export const books = sqliteTable('books', {
   id: text('id').primaryKey(),
@@ -19,7 +19,14 @@ export const books = sqliteTable('books', {
   finished: integer('finished', { mode: 'boolean' }).default(false).notNull(),
   userId: text('user_id')
     .references(() => user.id, { onDelete: 'cascade' }),
-});
+}, (table) => [
+  index('books_user_id_idx').on(table.userId),
+  index('books_title_author_idx').on(table.title, table.author),
+  index('books_finished_idx').on(table.finished),
+  index('books_genre_idx').on(table.genre),
+  index('books_user_title_id_idx').on(table.userId, table.title, table.id),
+  index('books_user_date_acquired_id_idx').on(table.userId, table.dateAcquired, table.id),
+]);
 
 export const readingSessions = sqliteTable('reading_sessions', {
   id: text('id').primaryKey(),
@@ -32,7 +39,12 @@ export const readingSessions = sqliteTable('reading_sessions', {
   finished: integer('finished', { mode: 'boolean' }).notNull(),
   userId: text('user_id')
     .references(() => user.id, { onDelete: 'cascade' }),
-});
+}, (table) => [
+  index('reading_sessions_book_id_idx').on(table.bookId),
+  index('reading_sessions_user_id_idx').on(table.userId),
+  index('reading_sessions_book_date_idx').on(table.bookId, table.date),
+  index('reading_sessions_user_date_id_idx').on(table.userId, table.date, table.id),
+]);
 
 export const user = sqliteTable("user", {
   id: text('id').primaryKey(),
@@ -53,7 +65,10 @@ export const session = sqliteTable("session", {
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
   userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' })
-});
+}, (table) => [
+  index('session_user_id_idx').on(table.userId),
+  index('session_expires_at_idx').on(table.expiresAt),
+]);
 
 export const account = sqliteTable("account", {
   id: text('id').primaryKey(),
@@ -69,7 +84,10 @@ export const account = sqliteTable("account", {
   password: text('password'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
-});
+}, (table) => [
+  index('account_user_id_idx').on(table.userId),
+  index('account_provider_idx').on(table.providerId, table.accountId),
+]);
 
 export const verification = sqliteTable("verification", {
   id: text('id').primaryKey(),
@@ -78,7 +96,10 @@ export const verification = sqliteTable("verification", {
   expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }),
   updatedAt: integer('updated_at', { mode: 'timestamp' })
-});
+}, (table) => [
+  index('verification_identifier_idx').on(table.identifier),
+  index('verification_expires_at_idx').on(table.expiresAt),
+]);
 
 // Types for our book and reading session data
 export type Book = typeof books.$inferSelect;

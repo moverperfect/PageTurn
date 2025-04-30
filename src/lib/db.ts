@@ -1,5 +1,5 @@
 // Types for our book and reading session data
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 import { getDbClient } from './db-client';
 import { books, readingSessions, type Book, type ReadingSession } from './schema';
 import { v4 as uuidv4 } from 'uuid';
@@ -181,10 +181,10 @@ export async function updateBook(id: string, updates: Partial<Omit<Book, 'id'>>,
 }
 
 /**
- * Deletes a book by its ID.
+ * Removes a book from the database by its unique ID.
  *
  * @param id - The unique identifier of the book to delete.
- * @returns True if the book was deleted; false if no matching book was found.
+ * @returns True if the book was successfully deleted; false if no matching book was found.
  *
  * @throws {Error} If a database error occurs during deletion.
  */
@@ -192,7 +192,10 @@ export async function deleteBook(id: string, env: Env): Promise<boolean> {
   try {
     const db = getDbClient(env);
     const result = await db.delete(books).where(eq(books.id, id));
-    return 'changes' in result ? result.changes > 0 : false;
+    if ('success' in result) {
+      return result.success;
+    }
+    return false;
   } catch (error) {
     console.error('Error deleting book:', error);
     throw new Error(`Failed to delete book: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -217,10 +220,10 @@ export async function getAllReadingSessions(env: Env): Promise<ReadingSession[]>
 }
 
 /**
- * Retrieves all reading sessions associated with a specific user.
+ * Retrieves all reading sessions for a given user.
  *
- * @param userId - The unique identifier of the user.
- * @returns An array of reading sessions belonging to the user.
+ * @param userId - The unique identifier of the user whose reading sessions are to be retrieved.
+ * @returns An array of reading sessions for the specified user.
  *
  * @throws {Error} If the database query fails.
  */
@@ -234,12 +237,11 @@ export async function getAllReadingSessionsForUser(userId: string, env: Env): Pr
   }
 }
 
-
 /**
- * Retrieves all reading sessions associated with a specific book.
+ * Retrieves all reading sessions for a given book.
  *
- * @param bookId - The ID of the book whose reading sessions are to be fetched.
- * @returns An array of {@link ReadingSession} objects for the specified book.
+ * @param bookId - The unique identifier of the book.
+ * @returns An array of reading sessions linked to the specified book.
  *
  * @throws {Error} If the database query fails.
  */
@@ -250,6 +252,33 @@ export async function getReadingSessionsForBook(bookId: string, env: Env): Promi
   } catch (error) {
     console.error('Error getting reading sessions for book:', error);
     throw new Error(`Failed to get reading sessions for book: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Retrieves all reading sessions for the specified book IDs.
+ *
+ * Returns an empty array if no book IDs are provided.
+ *
+ * @param bookIds - The IDs of the books to retrieve reading sessions for.
+ * @returns An array of reading sessions associated with the given books.
+ *
+ * @throws {Error} If the database query fails.
+ */
+export async function getReadingSessionsForBooks(bookIds: string[], env: Env): Promise<ReadingSession[]> {
+  if (bookIds.length === 0) {
+    return [];
+  }
+
+  try {
+    const db = getDbClient(env);
+    return await db
+      .select()
+      .from(readingSessions)
+      .where(inArray(readingSessions.bookId, bookIds));
+  } catch (error) {
+    console.error('Error getting reading sessions for books:', error);
+    throw new Error(`Failed to get reading sessions for books: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -280,16 +309,19 @@ export async function getReadingSessionById(
 }
 
 /**
- * Adds a new reading session to the database and returns the created session.
+ * Creates a new reading session in the database and returns the resulting session object.
  *
- * @returns The newly created {@link ReadingSession} object, including its generated ID.
+ * If {@link sessionData.userId} is not provided, the {@link userId} argument is used for the session's user.
  *
- * @throws {Error} If the reading session could not be added to the database.
+ * @returns The created {@link ReadingSession} with its generated ID.
+ *
+ * @throws {Error} If the reading session cannot be added to the database.
  */
-export async function addReadingSession(sessionData: Omit<ReadingSession, 'id'>, env: Env): Promise<ReadingSession> {
+export async function addReadingSession(sessionData: Omit<ReadingSession, 'id'>, env: Env, userId: string): Promise<ReadingSession> {
   const newSession = {
     ...sessionData,
-    id: uuidv4()
+    id: uuidv4(),
+    userId: sessionData.userId || userId
   };
 
   try {
@@ -326,7 +358,7 @@ export async function updateReadingSession(id: string, updates: Partial<Omit<Rea
 }
 
 /**
- * Deletes a reading session by its ID.
+ * Deletes a reading session by its unique ID.
  *
  * @param id - The unique identifier of the reading session to delete.
  * @returns True if the reading session was deleted; false if no matching session was found.
@@ -337,7 +369,10 @@ export async function deleteReadingSession(id: string, env: Env): Promise<boolea
   try {
     const db = getDbClient(env);
     const result = await db.delete(readingSessions).where(eq(readingSessions.id, id));
-    return 'changes' in result ? result.changes > 0 : false;
+    if ('success' in result) {
+      return result.success;
+    }
+    return false;
   } catch (error) {
     console.error('Error deleting reading session:', error);
     throw new Error(`Failed to delete reading session: ${error instanceof Error ? error.message : 'Unknown error'}`);

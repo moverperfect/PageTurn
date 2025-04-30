@@ -3,7 +3,7 @@ import Layout from '../layouts/Layout.astro';
 import {
   calculateProgress,
   estimateFinishDate,
-  getAllReadingSessionsForUser,
+  getReadingSessionsForBooks,
   getCurrentlyReadingBooksForUser,
 } from '../lib/db';
 
@@ -16,15 +16,18 @@ const currentlyReadingBooks = await getCurrentlyReadingBooksForUser(
   userId,
   Astro.locals.runtime.env
 );
-const allSessions = await getAllReadingSessionsForUser(
-  userId,
+
+// Get only the reading sessions for the books being currently read
+const currentBookIds = currentlyReadingBooks.map((book) => book.id);
+const relevantSessions = await getReadingSessionsForBooks(
+  currentBookIds,
   Astro.locals.runtime.env
 );
 
 // Calculate statistics for each book
 const booksWithStats = currentlyReadingBooks.map((book) => {
-  const progress = calculateProgress(book, allSessions);
-  const estimatedFinish = estimateFinishDate(book, allSessions);
+  const progress = calculateProgress(book, relevantSessions);
+  const estimatedFinish = estimateFinishDate(book, relevantSessions);
 
   return {
     ...book,

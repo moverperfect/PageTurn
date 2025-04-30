@@ -6,10 +6,13 @@ interface Props {
 }
 
 const { title = 'PageTurn' } = Astro.props;
-
-// Get user session
-let session = Astro.locals.session;
+const session = Astro.locals.session;
 const isLoggedIn = !!session?.User;
+
+let googleClientId;
+if (!isLoggedIn) {
+  googleClientId = Astro.locals.runtime.env.GOOGLE_CLIENT_ID;
+}
 ---
 
 <!doctype html>
@@ -19,7 +22,6 @@ const isLoggedIn = !!session?.User;
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
-    <link rel="manifest" href="/site.webmanifest" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -30,28 +32,19 @@ const isLoggedIn = !!session?.User;
     />
   </head>
   <body>
-    <div class="min-h-screen flex flex-col relative">
-      <!-- Background elements -->
-      <div class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div
-          class="absolute -top-40 -right-40 w-80 h-80 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10"
-        >
-        </div>
-        <div
-          class="absolute top-1/3 left-0 w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10"
-        >
-        </div>
-        <div
-          class="absolute -bottom-40 right-1/4 w-80 h-80 bg-indigo-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10"
-        >
-        </div>
+    <div class="min-h-screen flex flex-col">
+      <!-- Simple gradient background -->
+      <div
+        class="fixed inset-0 bg-gradient-to-br from-slate-900 to-slate-950 z-0"
+      >
       </div>
 
       <header
-        class="relative z-10 bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 shadow-lg"
+        class="relative z-20 bg-slate-900/80 backdrop-blur-sm border-b border-slate-800"
       >
         <div class="container mx-auto px-4 py-4">
           <div class="flex justify-between items-center">
+            <!-- Logo -->
             <a
               href="/"
               class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 text-transparent bg-clip-text flex items-center gap-2"
@@ -67,6 +60,8 @@ const isLoggedIn = !!session?.User;
               </picture>
               PageTurn
             </a>
+
+            <!-- Navigation -->
             <nav class="flex items-center">
               <ul class="flex space-x-6 mr-4">
                 <li>
@@ -104,15 +99,12 @@ const isLoggedIn = !!session?.User;
 
               {
                 isLoggedIn ? (
-                  <div class="relative dropdown-container">
-                    <input
-                      type="checkbox"
-                      id="profile-checkbox"
-                      class="peer hidden"
-                    />
-                    <label
-                      for="profile-checkbox"
-                      class="flex items-center cursor-pointer p-1.5 rounded-full hover:bg-slate-800 transition-colors"
+                  <div class="relative" id="profile-dropdown">
+                    <button
+                      id="profile-button"
+                      type="button"
+                      class="flex items-center p-1.5 rounded-full hover:bg-slate-800 transition-colors cursor-pointer"
+                      aria-expanded="false"
                     >
                       {session.User.image ? (
                         <img
@@ -127,11 +119,11 @@ const isLoggedIn = !!session?.User;
                             '?'}
                         </div>
                       )}
-                    </label>
+                    </button>
 
                     <div
-                      class="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-xl border border-slate-700 z-50
-                           scale-0 origin-top-right peer-checked:scale-100 transition-transform"
+                      id="profile-menu"
+                      class="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-xl border border-slate-700 z-50 hidden"
                     >
                       <div class="px-4 py-2 border-b border-slate-700">
                         <p class="font-medium text-sm text-white truncate">
@@ -149,7 +141,8 @@ const isLoggedIn = !!session?.User;
                       </a>
                       <button
                         id="logout-btn"
-                        class="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-slate-700 transition-colors"
+                        type="button"
+                        class="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-slate-700 transition-colors cursor-pointer"
                       >
                         Sign Out
                       </button>
@@ -184,12 +177,8 @@ const isLoggedIn = !!session?.User;
     <style>
       html {
         font-family: 'Inter', sans-serif;
-        scrollbar-color: rgba(99, 102, 241, 0.5) rgba(15, 23, 42, 0.1);
         scrollbar-width: thin;
-      }
-
-      body {
-        transition: opacity 0.15s ease-in-out;
+        scrollbar-color: rgba(99, 102, 241, 0.5) rgba(15, 23, 42, 0.1);
       }
 
       ::-webkit-scrollbar {
@@ -210,50 +199,80 @@ const isLoggedIn = !!session?.User;
         background: rgba(99, 102, 241, 0.7);
       }
     </style>
-
+    {
+      !isLoggedIn ? (
+        /* prettier-ignore */
+        <div id="client-id" class="hidden">{googleClientId}</div>
+      ) : (
+        ''
+      )
+    }
     <script>
-      import { authClient } from '../lib/auth-client.js';
+      import { createAuthClient } from 'better-auth/client';
+      import { oneTapClient } from 'better-auth/client/plugins';
 
-      // Prevent white flash during page transitions
-      document.addEventListener('astro:before-preparation', () => {
-        document.documentElement.style.scrollBehavior = 'auto';
-        document.body.style.opacity = '0.5';
-      });
+      // Initialize dropdown functionality
+      async function setupProfileDropdown() {
+        const profileButton = document.getElementById('profile-button');
+        const profileMenu = document.getElementById('profile-menu');
 
-      document.addEventListener('astro:page-load', () => {
-        document.body.style.opacity = '1';
-        document.documentElement.style.scrollBehavior = 'smooth';
-      });
+        if (profileButton && profileMenu) {
+          // Toggle menu on button click
+          profileButton.addEventListener('click', () => {
+            const isExpanded =
+              profileButton.getAttribute('aria-expanded') === 'true';
+            profileButton.setAttribute(
+              'aria-expanded',
+              (!isExpanded).toString()
+            );
+            profileMenu.classList.toggle('hidden');
+          });
 
-      // Click-outside handler for the profile dropdown
-      const checkbox = document.getElementById('profile-checkbox');
-      const container = document.querySelector('.dropdown-container');
-      if (checkbox && container) {
-        document.addEventListener('click', (e) => {
-          if (
-            (checkbox as HTMLInputElement).checked &&
-            !container.contains(e.target as Node) &&
-            e.target !== checkbox
-          ) {
-            (checkbox as HTMLInputElement).checked = false;
-          }
-        });
-      }
+          // Close menu when clicking outside
+          document.addEventListener('click', (e) => {
+            if (
+              !profileButton.contains(e.target as Node) &&
+              !profileMenu.contains(e.target as Node)
+            ) {
+              profileButton.setAttribute('aria-expanded', 'false');
+              profileMenu.classList.add('hidden');
+            }
+          });
+        }
 
-      // Logout button
-      const logoutBtn = document.getElementById('logout-btn');
-      if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-          try {
-            authClient.signOut().catch((error) => {
+        const rawId = document.getElementById('client-id')?.textContent?.trim();
+        const googleClientId = rawId ? rawId : undefined;
+
+        if (googleClientId) {
+          window.PageTurnAuthClient = createAuthClient({
+            plugins: [
+              oneTapClient({
+                clientId: googleClientId,
+              }),
+            ],
+          });
+        } else {
+          window.PageTurnAuthClient = createAuthClient();
+        }
+
+        // Setup logout functionality
+        const logoutBtn = document.getElementById('logout-btn');
+        if (logoutBtn) {
+          logoutBtn.addEventListener('click', async () => {
+            try {
+              await window.PageTurnAuthClient.signOut();
+              window.location.href = '/login';
+            } catch (error) {
               console.error('Failed to sign out:', error);
-              alert('Failed to sign out');
-            });
-          } catch (error) {
-            console.error('Error importing auth client:', error);
-          }
-        });
+            }
+          });
+        }
+
+        if (googleClientId) {
+          await window.PageTurnAuthClient.oneTap();
+        }
       }
+      setupProfileDropdown();
     </script>
   </body>
 </html>
