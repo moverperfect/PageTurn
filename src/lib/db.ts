@@ -1,5 +1,5 @@
 // Types for our book and reading session data
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 import { getDbClient } from './db-client';
 import { books, readingSessions, type Book, type ReadingSession } from './schema';
 import { v4 as uuidv4 } from 'uuid';
@@ -237,7 +237,6 @@ export async function getAllReadingSessionsForUser(userId: string, env: Env): Pr
   }
 }
 
-
 /**
  * Retrieves all reading sessions associated with a specific book.
  *
@@ -253,6 +252,32 @@ export async function getReadingSessionsForBook(bookId: string, env: Env): Promi
   } catch (error) {
     console.error('Error getting reading sessions for book:', error);
     throw new Error(`Failed to get reading sessions for book: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Retrieves all reading sessions associated with multiple books.
+ *
+ * @param bookIds - An array of book IDs whose reading sessions are to be fetched.
+ * @param env - The environment object containing the database configuration.
+ * @returns An array of {@link ReadingSession} objects for the specified books.
+ *
+ * @throws {Error} If the database query fails.
+ */
+export async function getReadingSessionsForBooks(bookIds: string[], env: Env): Promise<ReadingSession[]> {
+  if (bookIds.length === 0) {
+    return [];
+  }
+
+  try {
+    const db = getDbClient(env);
+    return await db
+      .select()
+      .from(readingSessions)
+      .where(inArray(readingSessions.bookId, bookIds));
+  } catch (error) {
+    console.error('Error getting reading sessions for books:', error);
+    throw new Error(`Failed to get reading sessions for books: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
