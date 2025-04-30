@@ -69,7 +69,9 @@ import Layout from '../layouts/Layout.astro';
 
       // Initialize event listeners when document is ready
       document.addEventListener('DOMContentLoaded', async () => {
-        const authClient = window.PageTurnAuthClient || createAuthClient();
+        const authClient =
+          window.PageTurnAuthClient ||
+          (window.PageTurnAuthClient = createAuthClient());
 
         const loginButton = document.getElementById('github-login');
         const googleLoginButton = document.getElementById('google-login');
