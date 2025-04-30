@@ -240,10 +240,10 @@ if (!isLoggedIn) {
           });
         }
 
-        const googleClientId =
-          document.getElementById('client-id')?.textContent;
+        const rawId = document.getElementById('client-id')?.textContent?.trim();
+        const googleClientId = rawId ? rawId : undefined;
 
-        if (googleClientId != null) {
+        if (googleClientId) {
           window.PageTurnAuthClient = createAuthClient({
             plugins: [
               oneTapClient({
@@ -268,7 +268,7 @@ if (!isLoggedIn) {
           });
         }
 
-        if (googleClientId != null) {
+        if (googleClientId) {
           await window.PageTurnAuthClient.oneTap();
         }
       }
