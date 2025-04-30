@@ -19,7 +19,7 @@ export const GET: APIRoute = async ({ locals }) => {
 export const POST: APIRoute = async ({ request, locals }) => {
   try {
     const sessionData = await request.json() as Omit<ReadingSession, 'id'>;
-    const newSession = await addReadingSession(sessionData, locals.runtime.env);
+    const newSession = await addReadingSession(sessionData, locals.runtime.env, locals.session.User.id);
 
     // If the session marks the book as finished, update the book's finished status
     if (sessionData.finished) {

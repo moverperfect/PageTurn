@@ -192,7 +192,10 @@ export async function deleteBook(id: string, env: Env): Promise<boolean> {
   try {
     const db = getDbClient(env);
     const result = await db.delete(books).where(eq(books.id, id));
-    return 'changes' in result ? result.changes > 0 : false;
+    if ('success' in result) {
+      return result.success;
+    }
+    return false;
   } catch (error) {
     console.error('Error deleting book:', error);
     throw new Error(`Failed to delete book: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -286,10 +289,11 @@ export async function getReadingSessionById(
  *
  * @throws {Error} If the reading session could not be added to the database.
  */
-export async function addReadingSession(sessionData: Omit<ReadingSession, 'id'>, env: Env): Promise<ReadingSession> {
+export async function addReadingSession(sessionData: Omit<ReadingSession, 'id'>, env: Env, userId: string): Promise<ReadingSession> {
   const newSession = {
     ...sessionData,
-    id: uuidv4()
+    id: uuidv4(),
+    userId: sessionData.userId || userId
   };
 
   try {
@@ -337,7 +341,10 @@ export async function deleteReadingSession(id: string, env: Env): Promise<boolea
   try {
     const db = getDbClient(env);
     const result = await db.delete(readingSessions).where(eq(readingSessions.id, id));
-    return 'changes' in result ? result.changes > 0 : false;
+    if ('success' in result) {
+      return result.success;
+    }
+    return false;
   } catch (error) {
     console.error('Error deleting reading session:', error);
     throw new Error(`Failed to delete reading session: ${error instanceof Error ? error.message : 'Unknown error'}`);
