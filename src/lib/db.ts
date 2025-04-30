@@ -181,10 +181,10 @@ export async function updateBook(id: string, updates: Partial<Omit<Book, 'id'>>,
 }
 
 /**
- * Deletes a book by its ID.
+ * Removes a book from the database by its unique ID.
  *
  * @param id - The unique identifier of the book to delete.
- * @returns True if the book was deleted; false if no matching book was found.
+ * @returns True if the book was successfully deleted; false if no matching book was found.
  *
  * @throws {Error} If a database error occurs during deletion.
  */
@@ -220,10 +220,10 @@ export async function getAllReadingSessions(env: Env): Promise<ReadingSession[]>
 }
 
 /**
- * Retrieves all reading sessions associated with a specific user.
+ * Retrieves all reading sessions for a given user.
  *
- * @param userId - The unique identifier of the user.
- * @returns An array of reading sessions belonging to the user.
+ * @param userId - The unique identifier of the user whose reading sessions are to be retrieved.
+ * @returns An array of reading sessions for the specified user.
  *
  * @throws {Error} If the database query fails.
  */
@@ -238,10 +238,10 @@ export async function getAllReadingSessionsForUser(userId: string, env: Env): Pr
 }
 
 /**
- * Retrieves all reading sessions associated with a specific book.
+ * Retrieves all reading sessions for a given book.
  *
- * @param bookId - The ID of the book whose reading sessions are to be fetched.
- * @returns An array of {@link ReadingSession} objects for the specified book.
+ * @param bookId - The unique identifier of the book.
+ * @returns An array of reading sessions linked to the specified book.
  *
  * @throws {Error} If the database query fails.
  */
@@ -256,11 +256,12 @@ export async function getReadingSessionsForBook(bookId: string, env: Env): Promi
 }
 
 /**
- * Retrieves all reading sessions associated with multiple books.
+ * Retrieves all reading sessions for the specified book IDs.
  *
- * @param bookIds - An array of book IDs whose reading sessions are to be fetched.
- * @param env - The environment object containing the database configuration.
- * @returns An array of {@link ReadingSession} objects for the specified books.
+ * Returns an empty array if no book IDs are provided.
+ *
+ * @param bookIds - The IDs of the books to retrieve reading sessions for.
+ * @returns An array of reading sessions associated with the given books.
  *
  * @throws {Error} If the database query fails.
  */
@@ -308,11 +309,13 @@ export async function getReadingSessionById(
 }
 
 /**
- * Adds a new reading session to the database and returns the created session.
+ * Creates a new reading session in the database and returns the resulting session object.
  *
- * @returns The newly created {@link ReadingSession} object, including its generated ID.
+ * If {@link sessionData.userId} is not provided, the {@link userId} argument is used for the session's user.
  *
- * @throws {Error} If the reading session could not be added to the database.
+ * @returns The created {@link ReadingSession} with its generated ID.
+ *
+ * @throws {Error} If the reading session cannot be added to the database.
  */
 export async function addReadingSession(sessionData: Omit<ReadingSession, 'id'>, env: Env, userId: string): Promise<ReadingSession> {
   const newSession = {
@@ -355,7 +358,7 @@ export async function updateReadingSession(id: string, updates: Partial<Omit<Rea
 }
 
 /**
- * Deletes a reading session by its ID.
+ * Deletes a reading session by its unique ID.
  *
  * @param id - The unique identifier of the reading session to delete.
  * @returns True if the reading session was deleted; false if no matching session was found.
