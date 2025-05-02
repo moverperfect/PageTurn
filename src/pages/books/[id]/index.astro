@@ -210,7 +210,7 @@ function formatDate(dateString: string): string {
                 You haven't logged any reading sessions for this book yet.
               </p>
               <a
-                href="/reading-sessions/new"
+                href={`/reading-sessions/new?bookId=${id}`}
                 class="btn w-full flex justify-center"
               >
                 <svg
@@ -269,7 +269,7 @@ function formatDate(dateString: string): string {
 
               <div class="pt-4">
                 <a
-                  href="/reading-sessions/new"
+                  href={`/reading-sessions/new?bookId=${id}`}
                   class="btn block w-full flex justify-center"
                 >
                   <svg
