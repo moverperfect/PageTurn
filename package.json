@@ -15,24 +15,24 @@
     "db:migrate:preview": "wrangler d1 migrations apply --env preview page-turn --remote"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^12.5.0",
-    "@libsql/client": "^0.15.4",
-    "@tailwindcss/vite": "^4.1.4",
-    "@types/uuid": "^10.0.0",
-    "astro": "^5.7.4",
-    "better-auth": "^1.2.7",
-    "drizzle-orm": "^0.42.0",
-    "uuid": "^11.1.0"
+    "@astrojs/cloudflare": "12.5.0",
+    "@libsql/client": "0.15.4",
+    "@tailwindcss/vite": "4.1.4",
+    "@types/uuid": "10.0.0",
+    "astro": "5.7.4",
+    "better-auth": "1.2.7",
+    "drizzle-orm": "0.42.0",
+    "uuid": "11.1.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^22.14.1",
-    "better-sqlite3": "^11.9.1",
-    "cross-env": "^7.0.3",
-    "drizzle-kit": "^0.31.0",
-    "tailwindcss": "^4.1.4",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.8.3",
-    "wrangler": "^4.12.0"
+    "@types/better-sqlite3": "7.6.13",
+    "@types/node": "22.14.1",
+    "better-sqlite3": "11.9.1",
+    "cross-env": "7.0.3",
+    "drizzle-kit": "0.31.0",
+    "tailwindcss": "4.1.4",
+    "ts-node": "10.9.2",
+    "typescript": "5.8.3",
+    "wrangler": "4.12.0"
   }
 }
