@@ -3,6 +3,9 @@ import Layout from '../../layouts/Layout.astro';
 import { getAllBooks } from '../../lib/db';
 
 const books = await getAllBooks(Astro.locals.runtime.env);
+
+// Get bookId from URL query parameters
+const bookId = Astro.url.searchParams.get('bookId') || '';
 ---
 
 <Layout title="Log Reading Session | PageTurn">
@@ -25,6 +28,20 @@ const books = await getAllBooks(Astro.locals.runtime.env);
         <form id="addSessionForm" class="max-w-xl mt-6 space-y-6">
           <div class="space-y-4">
             <div>
+              <label for="bookId" class="form-label">
+                Book
+              </label>
+              <select id="bookId" name="bookId" required class="form-input">
+                <option value="">Select a book</option>
+                {books.map((book) => (
+                  <option value={book.id} selected={book.id === bookId}>
+                    {book.title} by {book.author}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
               <label for="date" class="form-label">
                 Date
               </label>
@@ -36,20 +53,6 @@ const books = await getAllBooks(Astro.locals.runtime.env);
                 class="form-input"
                 value={new Date().toISOString().split('T')[0]}
               />
-            </div>
-
-            <div>
-              <label for="bookId" class="form-label">
-                Book
-              </label>
-              <select id="bookId" name="bookId" required class="form-input">
-                <option value="">Select a book</option>
-                {books.map((book) => (
-                  <option value={book.id}>
-                    {book.title} by {book.author}
-                  </option>
-                ))}
-              </select>
             </div>
 
             <div>
@@ -131,9 +134,22 @@ const books = await getAllBooks(Astro.locals.runtime.env);
     const durationInput = document.getElementById(
       'duration'
     ) as HTMLInputElement;
+    const bookIdSelect = document.getElementById('bookId');
+    const dateInput = document.getElementById('date');
     const statsDiv = document.getElementById('stats');
     const pagesPerHourSpan = document.getElementById('pagesPerHour');
     const minutesPerPageSpan = document.getElementById('minutesPerPage');
+
+    // Set focus based on whether bookId is in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasBookId = urlParams.has('bookId');
+
+    // Focus on date if book is already selected, otherwise focus on book dropdown
+    if (hasBookId && dateInput instanceof HTMLInputElement) {
+      dateInput.focus();
+    } else if (bookIdSelect instanceof HTMLSelectElement) {
+      bookIdSelect.focus();
+    }
 
     // Parse HH:MM:SS to seconds
     function parseDuration(timeString: string) {

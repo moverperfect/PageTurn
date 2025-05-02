@@ -79,49 +79,62 @@ const booksWithStats = currentlyReadingBooks.map((book) => {
         ) : (
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
             {booksWithStats.map((book) => (
-              <div class="card">
-                <h3 class="mb-1">{book.title}</h3>
-                <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  by {book.author}
-                </p>
-
-                <div class="mb-3">
-                  <div class="w-full bg-gray-200 rounded-full h-2.5">
-                    <div
-                      class="bg-blue-600 h-2.5 rounded-full"
-                      style={`width: ${book.percentComplete}%`}
-                    />
-                  </div>
-                  <div class="flex justify-between text-sm mt-1">
-                    <span>
-                      {book.pagesRead} / {book.pageCount} pages
-                    </span>
-                    <span>{book.percentComplete.toFixed(1)}%</span>
-                  </div>
-                </div>
-
-                <div class="text-sm">
-                  <p>
-                    Reading speed: {book.pagesPerHour.toFixed(1)} pages/hour
+              <div class="card flex flex-col h-full">
+                <div class="flex-grow">
+                  <h3
+                    class="mb-1 truncate overflow-hidden text-ellipsis"
+                    title={book.title}
+                  >
+                    {book.title}
+                  </h3>
+                  <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    by {book.author}
                   </p>
-                  <p>
-                    Est. time to finish: {book.estimatedHoursLeft.toFixed(1)}{' '}
-                    hours
-                  </p>
-                  {book.estimatedFinishDate && (
+
+                  <div class="mb-3">
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                      <div
+                        class="bg-blue-600 h-2.5 rounded-full"
+                        style={`width: ${book.percentComplete}%`}
+                      />
+                    </div>
+                    <div class="flex justify-between text-sm mt-1">
+                      <span>
+                        {book.pagesRead} / {book.pageCount} pages
+                      </span>
+                      <span>{book.percentComplete.toFixed(1)}%</span>
+                    </div>
+                  </div>
+
+                  <div class="text-sm">
                     <p>
-                      Est. finish date:{' '}
-                      {book.estimatedFinishDate.toLocaleDateString()}
+                      Reading speed: {book.pagesPerHour.toFixed(1)} pages/hour
                     </p>
-                  )}
+                    <p>
+                      Est. time to finish: {book.estimatedHoursLeft.toFixed(1)}{' '}
+                      hours
+                    </p>
+                    {book.estimatedFinishDate && (
+                      <p>
+                        Est. finish date:{' '}
+                        {book.estimatedFinishDate.toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                <div class="mt-4">
+                <div class="mt-4 flex gap-2">
                   <a
                     href={`/books/${book.id}`}
-                    class="btn-secondary w-full block text-center"
+                    class="btn-secondary flex-1 block text-center"
                   >
                     View Details
+                  </a>
+                  <a
+                    href={`/reading-sessions/new?bookId=${book.id}`}
+                    class="btn flex-1 block text-center"
+                  >
+                    Log Session
                   </a>
                 </div>
               </div>
