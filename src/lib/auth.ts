@@ -24,6 +24,7 @@ export const auth = betterAuth({
     admin({
       adminRoles: ["admin"],
       defaultRole: "user",
+      impersonationSessionDuration: 60 * 60,
       defaultBanReason: "Banned by administrator",
       bannedUserMessage: "Your account has been suspended. Please contact support if you believe this is an error."
     }),

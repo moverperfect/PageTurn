@@ -1,6 +1,5 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { getAuth } from '../../lib/auth';
 
 // Check if current user is admin
 const session = Astro.locals.session;
@@ -10,33 +9,12 @@ if (!currentUser) {
   return Astro.redirect('/login');
 }
 
-// Admin check - we'll use the server-side auth to check admin role
-const auth = getAuth(Astro.locals.runtime.env);
-let isAdmin = false;
-
-try {
-  // Check if user has admin role
-  const hasAdminPermission = await auth.api.userHasPermission({
-    body: {
-      userId: currentUser.id,
-      permissions: {
-        user: ['ban'],
-      },
-    },
-  });
-
-  isAdmin = !!hasAdminPermission;
-} catch (error) {
-  console.error('Error checking admin permissions:', error);
-}
+let isAdmin = Astro.locals.session?.User?.role === 'admin';
 
 // If not admin, redirect to home
 if (!isAdmin) {
   return Astro.redirect('/');
 }
-
-// For initial render, we'll leave the users empty and load them via client-side
-// This avoids trying to use the client in server-side code
 ---
 
 <Layout title="Admin Dashboard | PageTurn">
@@ -156,7 +134,9 @@ if (!isAdmin) {
   const sessionsTableBody = document.getElementById('sessionsTableBody');
 
   // Load users on page load
-  loadUsers();
+  document.addEventListener('DOMContentLoaded', () => {
+    loadUsers();
+  });
 
   async function loadUsers() {
     try {
@@ -190,72 +170,123 @@ if (!isAdmin) {
       const currentUserId = currentSession?.data?.user?.id;
 
       // Render the users
-      usersTableBody.innerHTML = response.data.users
-        .map(
-          (user: any) => `
-        <tr data-user-id="${user.id}">
-          <td class="flex items-center gap-2">
-            ${
-              user.image
-                ? `<img src="${user.image}" alt="" class="w-6 h-6 rounded-full" />`
-                : `<div class="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs">
-                  ${user.name?.charAt(0) || user.email?.charAt(0) || '?'}
-                </div>`
-            }
-            ${user.name}
-          </td>
-          <td>${user.email}</td>
-          <td>${new Date(user.createdAt).toLocaleDateString()}</td>
-          <td>
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-800 text-indigo-200">
-              ${user.role || 'user'}
-            </span>
-          </td>
-          <td>
-            <div class="flex gap-2">
-              <button 
-                class="view-sessions-btn text-xs px-2 py-1 bg-blue-700 hover:bg-blue-600 text-white rounded"
-                data-user-id="${user.id}"
-              >
-                Sessions
-              </button>
-              <button 
-                class="make-admin-btn text-xs px-2 py-1 bg-green-700 hover:bg-green-600 text-white rounded"
-                data-user-id="${user.id}"
-                data-user-role="${user.role || 'user'}"
-              >
-                ${user.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
-              </button>
-              <button 
-                class="impersonate-btn text-xs px-2 py-1 bg-purple-700 hover:bg-purple-600 text-white rounded"
-                data-user-id="${user.id}"
-                ${user.id === currentUserId ? 'disabled' : ''}
-                ${user.id === currentUserId ? 'title="Cannot impersonate yourself"' : ''}
-                ${user.id === currentUserId ? 'style="opacity: 0.5; cursor: not-allowed;"' : ''}
-              >
-                Impersonate
-              </button>
-              <button 
-                class="logout-user-btn text-xs px-2 py-1 bg-amber-700 hover:bg-amber-600 text-white rounded"
-                data-user-id="${user.id}"
-              >
-                Log Out
-              </button>
-              <button 
-                class="delete-user-btn text-xs px-2 py-1 bg-red-700 hover:bg-red-600 text-white rounded"
-                data-user-id="${user.id}"
-              >
-                Delete
-              </button>
-            </div>
-          </td>
-        </tr>
-      `
-        )
-        .join('');
+      // Create DOM elements safely instead of using innerHTML with template literals
+      usersTableBody.replaceChildren(
+        ...response.data.users.map((user: any) => {
+          const tr = document.createElement('tr');
+          tr.dataset.userId = user.id;
 
-      // Add event listeners to buttons
-      setupButtonEventListeners();
+          // Name cell with avatar
+          const nameTd = document.createElement('td');
+          nameTd.className = 'flex items-center gap-2';
+
+          // Create avatar
+          if (user.image) {
+            const img = document.createElement('img');
+            img.src = user.image;
+            img.alt = '';
+            img.className = 'w-6 h-6 rounded-full';
+            nameTd.appendChild(img);
+          } else {
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className =
+              'w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs';
+            avatarDiv.textContent =
+              user.name?.charAt(0) || user.email?.charAt(0) || '?';
+            nameTd.appendChild(avatarDiv);
+          }
+
+          // Add name text
+          const nameText = document.createTextNode(user.name || '');
+          nameTd.appendChild(nameText);
+          tr.appendChild(nameTd);
+
+          // Email cell
+          const emailTd = document.createElement('td');
+          emailTd.textContent = user.email || '';
+          tr.appendChild(emailTd);
+
+          // Created date cell
+          const dateTd = document.createElement('td');
+          dateTd.textContent = new Date(user.createdAt).toLocaleDateString();
+          tr.appendChild(dateTd);
+
+          // Role cell
+          const roleTd = document.createElement('td');
+          const roleSpan = document.createElement('span');
+          roleSpan.className =
+            'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-800 text-indigo-200';
+          roleSpan.textContent = user.role || 'user';
+          roleTd.appendChild(roleSpan);
+          tr.appendChild(roleTd);
+
+          // Actions cell
+          const actionsTd = document.createElement('td');
+          const actionsDiv = document.createElement('div');
+          actionsDiv.className = 'flex gap-2';
+
+          // Sessions button
+          const sessionsBtn = document.createElement('button');
+          sessionsBtn.className =
+            'view-sessions-btn text-xs px-2 py-1 bg-blue-700 hover:bg-blue-600 text-white rounded';
+          sessionsBtn.dataset.userId = user.id;
+          sessionsBtn.textContent = 'Sessions';
+          actionsDiv.appendChild(sessionsBtn);
+
+          // Make admin button
+          const adminBtn = document.createElement('button');
+          adminBtn.className =
+            'make-admin-btn text-xs px-2 py-1 bg-green-700 hover:bg-green-600 text-white rounded';
+          adminBtn.dataset.userId = user.id;
+          adminBtn.dataset.userRole = user.role || 'user';
+          adminBtn.textContent =
+            user.role === 'admin' ? 'Remove Admin' : 'Make Admin';
+          actionsDiv.appendChild(adminBtn);
+
+          // Impersonate button
+          const impersonateBtn = document.createElement('button');
+          impersonateBtn.className =
+            'impersonate-btn text-xs px-2 py-1 bg-purple-700 hover:bg-purple-600 text-white rounded';
+          impersonateBtn.dataset.userId = user.id;
+          impersonateBtn.textContent = 'Impersonate';
+
+          if (user.id === currentUserId) {
+            impersonateBtn.disabled = true;
+            impersonateBtn.title = 'Cannot impersonate yourself';
+            impersonateBtn.style.opacity = '0.5';
+            impersonateBtn.style.cursor = 'not-allowed';
+          }
+
+          actionsDiv.appendChild(impersonateBtn);
+
+          // Logout button
+          const logoutBtn = document.createElement('button');
+          logoutBtn.className =
+            'logout-user-btn text-xs px-2 py-1 bg-amber-700 hover:bg-amber-600 text-white rounded';
+          logoutBtn.dataset.userId = user.id;
+          logoutBtn.textContent = 'Log Out';
+          actionsDiv.appendChild(logoutBtn);
+
+          // Delete button
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className =
+            'delete-user-btn text-xs px-2 py-1 bg-red-700 hover:bg-red-600 text-white rounded';
+          deleteBtn.dataset.userId = user.id;
+          deleteBtn.textContent = 'Delete';
+          actionsDiv.appendChild(deleteBtn);
+
+          actionsTd.appendChild(actionsDiv);
+          tr.appendChild(actionsTd);
+
+          return tr;
+        })
+      );
+
+      // Use event delegation instead of attaching listeners to each button
+      if (!usersTableBody.hasAttribute('data-has-listeners')) {
+        setupButtonEventListeners();
+        usersTableBody.setAttribute('data-has-listeners', 'true');
+      }
     } catch (error) {
       console.error('Error loading users:', error);
       if (usersTableBody) {
@@ -456,26 +487,49 @@ if (!isAdmin) {
       if (sessionsTableBody) {
         const sessions = response.data.sessions;
         if (sessions && sessions.length > 0) {
-          sessionsTableBody.innerHTML = sessions
-            .map(
-              (session: any) => `
-            <tr data-session-id="${session.id}">
-              <td>${session.userAgent || 'Unknown'}</td>
-              <td>${session.ipAddress || 'Unknown'}</td>
-              <td>${new Date(session.createdAt).toLocaleString()}</td>
-              <td>${new Date(session.expiresAt).toLocaleString()}</td>
-              <td>
-                <button 
-                  class="revoke-session-btn text-xs px-2 py-1 bg-amber-700 hover:bg-amber-600 text-white rounded"
-                  data-session-token="${session.token}"
-                >
-                  Revoke
-                </button>
-              </td>
-            </tr>
-          `
-            )
-            .join('');
+          // Create DOM elements safely instead of using innerHTML with template literals
+          sessionsTableBody.replaceChildren(
+            ...sessions.map((session: any) => {
+              const tr = document.createElement('tr');
+              tr.dataset.sessionId = session.id;
+
+              // User agent cell
+              const userAgentTd = document.createElement('td');
+              userAgentTd.textContent = session.userAgent || 'Unknown';
+              tr.appendChild(userAgentTd);
+
+              // IP address cell
+              const ipTd = document.createElement('td');
+              ipTd.textContent = session.ipAddress || 'Unknown';
+              tr.appendChild(ipTd);
+
+              // Created date cell
+              const createdTd = document.createElement('td');
+              createdTd.textContent = new Date(
+                session.createdAt
+              ).toLocaleString();
+              tr.appendChild(createdTd);
+
+              // Expires date cell
+              const expiresTd = document.createElement('td');
+              expiresTd.textContent = new Date(
+                session.expiresAt
+              ).toLocaleString();
+              tr.appendChild(expiresTd);
+
+              // Actions cell
+              const actionsTd = document.createElement('td');
+              const revokeBtn = document.createElement('button');
+              revokeBtn.className =
+                'revoke-session-btn text-xs px-2 py-1 bg-amber-700 hover:bg-amber-600 text-white rounded';
+              revokeBtn.dataset.sessionToken = session.token;
+              revokeBtn.textContent = 'Revoke';
+              actionsTd.appendChild(revokeBtn);
+              tr.appendChild(actionsTd);
+
+              return tr;
+            })
+          );
 
           // Add event listeners to revoke buttons
           document.querySelectorAll('.revoke-session-btn').forEach((btn) => {
@@ -498,8 +552,13 @@ if (!isAdmin) {
             });
           });
         } else {
-          sessionsTableBody.innerHTML =
-            '<tr><td colspan="5" class="text-center">No active sessions found</td></tr>';
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 5;
+          td.className = 'text-center';
+          td.textContent = 'No active sessions found';
+          tr.appendChild(td);
+          sessionsTableBody.replaceChildren(tr);
         }
       }
     } catch (error) {

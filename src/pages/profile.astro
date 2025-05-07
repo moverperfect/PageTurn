@@ -299,14 +299,12 @@ if (!user) {
       // Get current user session
       const session = await window.PageTurnAuthClient.getSession();
 
-      if (!session || !session.user || !session.user.id) {
+      if (!session || !session.data.user || !session.data.user.id) {
         alert('Unable to update profile. Please try again later.');
         return;
       }
 
-      // Use the admin.createUser function to update the user
-      await window.PageTurnAuthClient.admin.createUser({
-        id: session.user.id,
+      await window.PageTurnAuthClient.updateUser({
         name: userData.name as string,
         image: (userData.image as string) || null,
       });
@@ -319,6 +317,3 @@ if (!user) {
     }
   });
 </script>
-
-<!-- Add user ID to meta for the client script -->
-<meta name="user-id" content={user.id} />

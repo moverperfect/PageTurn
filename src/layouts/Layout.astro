@@ -1,7 +1,5 @@
 ---
 import '../styles/global.css';
-import { getDbClient } from '../lib/db-client';
-import { user } from '../lib/schema';
 
 interface Props {
   title?: string;
@@ -13,7 +11,7 @@ const isLoggedIn = !!session?.User;
 
 // Check if the user is impersonating someone else
 // @ts-ignore - impersonatedBy is added by the BetterAuth admin plugin
-const isImpersonating = session?.Session?.impersonatedBy || false;
+const isImpersonating = !!session?.Session?.impersonatedBy;
 
 // Check if the current user is an admin (first registered user)
 let isAdmin = Astro.locals.session?.User?.role === 'admin';
