@@ -1,0 +1,324 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const session = Astro.locals.session;
+const user = session?.User;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+---
+
+<Layout title="My Profile | PageTurn">
+  <div class="max-w-3xl mx-auto">
+    <h1>My Profile</h1>
+
+    <div class="card mb-8">
+      <div class="flex items-start gap-6">
+        <div class="shrink-0">
+          {
+            user.image ? (
+              <img
+                src={user.image}
+                alt="Profile picture"
+                class="w-24 h-24 rounded-lg border border-slate-600"
+              />
+            ) : (
+              <div class="w-24 h-24 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-3xl">
+                {user.name?.charAt(0) || user.email?.charAt(0) || '?'}
+              </div>
+            )
+          }
+        </div>
+
+        <div class="flex-1">
+          <div class="mb-4">
+            <h3 class="text-xl font-semibold mb-1">{user.name || 'User'}</h3>
+            <p class="text-gray-400">{user.email}</p>
+            <p class="text-sm text-gray-500 mt-1">
+              Member since {new Date(user.createdAt).toLocaleDateString()}
+            </p>
+            {
+              user.role && (
+                <p class="mt-2">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-800 text-indigo-200">
+                    {user.role}
+                  </span>
+                </p>
+              )
+            }
+          </div>
+
+          <div class="flex gap-2">
+            <button id="update-profile" class="btn-secondary text-sm">
+              Update Profile
+            </button>
+            <button id="view-sessions" class="btn-secondary text-sm">
+              Active Sessions
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="update-form-container" style="display: none;">
+      <h2 class="text-xl mb-4">Update Profile</h2>
+
+      <form id="profile-form" class="space-y-4">
+        <div>
+          <label for="name" class="form-label">Name</label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            class="form-input"
+            value={user.name || ''}
+            required
+          />
+        </div>
+
+        <div>
+          <label for="email" class="form-label">Email</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            class="form-input"
+            value={user.email || ''}
+            disabled
+          />
+          <p class="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+        </div>
+
+        <div>
+          <label for="image" class="form-label">Profile Image URL</label>
+          <input
+            type="url"
+            id="image"
+            name="image"
+            class="form-input"
+            value={user.image || ''}
+            placeholder="https://example.com/avatar.jpg"
+          />
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button type="submit" class="btn">Save Changes</button>
+          <button type="button" id="cancel-update" class="btn-secondary"
+            >Cancel</button
+          >
+        </div>
+      </form>
+    </div>
+
+    <!-- Sessions Modal -->
+    <div
+      id="sessionsModal"
+      class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden"
+    >
+      <div
+        class="bg-slate-800 rounded-lg p-6 max-w-3xl w-full border border-slate-700"
+      >
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold">My Active Sessions</h3>
+          <button id="closeSessionsBtn" class="text-gray-400 hover:text-white">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div id="sessionsContent" class="max-h-[70vh] overflow-y-auto">
+          <table class="w-full">
+            <thead>
+              <tr>
+                <th>Device</th>
+                <th>IP Address</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="sessionsTableBody">
+              <!-- Sessions will be loaded here -->
+              <tr>
+                <td colspan="4" class="text-center py-4">Loading sessions...</td
+                >
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  // Toggle update form visibility
+  const updateProfileBtn = document.getElementById('update-profile');
+  const updateFormContainer = document.getElementById('update-form-container');
+  const cancelUpdateBtn = document.getElementById('cancel-update');
+  const profileForm = document.getElementById('profile-form');
+
+  // Sessions modal elements
+  const viewSessionsBtn = document.getElementById('view-sessions');
+  const sessionsModal = document.getElementById('sessionsModal');
+  const closeSessionsBtn = document.getElementById('closeSessionsBtn');
+  const sessionsTableBody = document.getElementById('sessionsTableBody');
+
+  updateProfileBtn?.addEventListener('click', () => {
+    updateFormContainer?.style.setProperty('display', 'block');
+  });
+
+  cancelUpdateBtn?.addEventListener('click', () => {
+    updateFormContainer?.style.setProperty('display', 'none');
+  });
+
+  // Handle sessions modal
+  viewSessionsBtn?.addEventListener('click', async () => {
+    sessionsModal?.classList.remove('hidden');
+    await loadUserSessions();
+  });
+
+  closeSessionsBtn?.addEventListener('click', () => {
+    sessionsModal?.classList.add('hidden');
+  });
+
+  // Close modal when clicking outside
+  sessionsModal?.addEventListener('click', (e) => {
+    if (e.target === sessionsModal) {
+      sessionsModal.classList.add('hidden');
+    }
+  });
+
+  // Load user sessions
+  async function loadUserSessions() {
+    try {
+      // Get current session token
+      const session = await window.PageTurnAuthClient.getSession();
+
+      if (!session || !session.data.user || !session.data.user.id) {
+        if (sessionsTableBody) {
+          sessionsTableBody.innerHTML =
+            '<tr><td colspan="4" class="text-center py-4 text-red-400">Unable to load session data</td></tr>';
+        }
+        return;
+      }
+
+      // Use admin plugin to get sessions for current user
+      const response = await window.PageTurnAuthClient.admin.listUserSessions({
+        userId: session.data.user.id,
+      });
+
+      // Find current session to mark it
+      const currentSessionToken = session.data.session.token;
+
+      if (sessionsTableBody) {
+        const sessions = response.data.sessions;
+        if (sessions && sessions.length > 0) {
+          sessionsTableBody.innerHTML = sessions
+            .map((session) => {
+              const isCurrent = session.token === currentSessionToken;
+              return `
+              <tr data-session-id="${session.id}" class="${isCurrent ? 'bg-slate-700/30' : ''}">
+                <td>${session.userAgent || 'Unknown'} ${isCurrent ? '<span class="ml-2 text-xs text-green-400">(Current)</span>' : ''}</td>
+                <td>${session.ipAddress || 'Unknown'}</td>
+                <td>${new Date(session.createdAt).toLocaleString()}</td>
+                <td>
+                  ${
+                    !isCurrent
+                      ? `
+                    <button 
+                      class="revoke-session-btn text-xs px-2 py-1 bg-amber-700 hover:bg-amber-600 text-white rounded"
+                      data-session-token="${session.token}"
+                    >
+                      Revoke
+                    </button>
+                  `
+                      : ''
+                  }
+                </td>
+              </tr>
+            `;
+            })
+            .join('');
+
+          // Add event listeners to revoke buttons
+          document.querySelectorAll('.revoke-session-btn').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+              const sessionToken = btn.getAttribute('data-session-token');
+              if (sessionToken) {
+                try {
+                  await window.PageTurnAuthClient.admin.revokeUserSession({
+                    sessionToken: sessionToken,
+                  });
+
+                  // Remove row
+                  const sessionRow = btn.closest('tr');
+                  sessionRow?.remove();
+                } catch (error) {
+                  console.error('Failed to revoke session:', error);
+                  alert('Failed to revoke session. Please try again.');
+                }
+              }
+            });
+          });
+        } else {
+          sessionsTableBody.innerHTML =
+            '<tr><td colspan="4" class="text-center py-4">No active sessions found</td></tr>';
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      if (sessionsTableBody) {
+        sessionsTableBody.innerHTML =
+          '<tr><td colspan="4" class="text-center py-4 text-red-400">Failed to load sessions</td></tr>';
+      }
+    }
+  }
+
+  // Handle form submission
+  profileForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(e.target as HTMLFormElement);
+    const userData = {
+      name: formData.get('name'),
+      image: formData.get('image'),
+    };
+
+    try {
+      // Get current user session
+      const session = await window.PageTurnAuthClient.getSession();
+
+      if (!session || !session.user || !session.user.id) {
+        alert('Unable to update profile. Please try again later.');
+        return;
+      }
+
+      // Use the admin.createUser function to update the user
+      await window.PageTurnAuthClient.admin.createUser({
+        id: session.user.id,
+        name: userData.name as string,
+        image: (userData.image as string) || null,
+      });
+
+      // Reload the page to show updated info
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      alert('Failed to update profile. Please try again.');
+    }
+  });
+</script>
+
+<!-- Add user ID to meta for the client script -->
+<meta name="user-id" content={user.id} />

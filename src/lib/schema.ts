@@ -53,7 +53,11 @@ export const user = sqliteTable("user", {
   emailVerified: integer('email_verified', { mode: 'boolean' }).notNull(),
   image: text('image'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  role: text('role'),
+  banned: integer('banned', { mode: 'boolean' }),
+  banReason: text('ban_reason'),
+  banExpires: integer('ban_expires', { mode: 'timestamp' })
 });
 
 export const session = sqliteTable("session", {
@@ -64,7 +68,8 @@ export const session = sqliteTable("session", {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
-  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' })
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  impersonatedBy: text('impersonated_by')
 }, (table) => [
   index('session_user_id_idx').on(table.userId),
   index('session_expires_at_idx').on(table.expiresAt),

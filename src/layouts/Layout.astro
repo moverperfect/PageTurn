@@ -1,5 +1,7 @@
 ---
 import '../styles/global.css';
+import { getDbClient } from '../lib/db-client';
+import { user } from '../lib/schema';
 
 interface Props {
   title?: string;
@@ -8,6 +10,13 @@ interface Props {
 const { title = 'PageTurn' } = Astro.props;
 const session = Astro.locals.session;
 const isLoggedIn = !!session?.User;
+
+// Check if the user is impersonating someone else
+// @ts-ignore - impersonatedBy is added by the BetterAuth admin plugin
+const isImpersonating = session?.Session?.impersonatedBy || false;
+
+// Check if the current user is an admin (first registered user)
+let isAdmin = Astro.locals.session?.User?.role === 'admin';
 
 let googleClientId;
 if (!isLoggedIn) {
@@ -38,6 +47,28 @@ if (!isLoggedIn) {
         class="fixed inset-0 bg-gradient-to-br from-slate-900 to-slate-950 z-0"
       >
       </div>
+
+      {
+        isImpersonating && (
+          <div class="fixed bottom-0 left-0 right-0 bg-amber-600 text-white p-4 flex justify-between items-center z-50">
+            <div>
+              <p class="font-medium">
+                You are currently impersonating another user
+              </p>
+              <p class="text-sm">
+                Only the content of the page is shown as the impersonated user
+                would see it.
+              </p>
+            </div>
+            <button
+              id="end-impersonation-btn"
+              class="bg-white text-amber-800 px-4 py-2 rounded font-medium hover:bg-amber-100 transition-colors"
+            >
+              End Impersonation
+            </button>
+          </div>
+        )
+      }
 
       <header
         class="relative z-20 bg-slate-900/80 backdrop-blur-sm border-b border-slate-800"
@@ -139,6 +170,23 @@ if (!isLoggedIn) {
                       >
                         Profile
                       </a>
+                      {isAdmin && (
+                        <a
+                          href="/admin"
+                          class="block px-4 py-2 text-sm hover:bg-slate-700 transition-colors"
+                        >
+                          Admin Dashboard
+                        </a>
+                      )}
+                      {isImpersonating && (
+                        <button
+                          id="menu-end-impersonation-btn"
+                          type="button"
+                          class="w-full text-left px-4 py-2 text-sm text-amber-400 hover:bg-slate-700 transition-colors cursor-pointer"
+                        >
+                          End Impersonation
+                        </button>
+                      )}
                       <button
                         id="logout-btn"
                         type="button"
@@ -208,13 +256,18 @@ if (!isLoggedIn) {
       )
     }
     <script>
-      import { createAuthClient } from 'better-auth/client';
-      import { oneTapClient } from 'better-auth/client/plugins';
+      import { initAuthClient } from '../lib/auth-client';
 
       // Initialize dropdown functionality
       async function setupProfileDropdown() {
         const profileButton = document.getElementById('profile-button');
         const profileMenu = document.getElementById('profile-menu');
+        const endImpersonationBtn = document.getElementById(
+          'end-impersonation-btn'
+        );
+        const menuEndImpersonationBtn = document.getElementById(
+          'menu-end-impersonation-btn'
+        );
 
         if (profileButton && profileMenu) {
           // Toggle menu on button click
@@ -243,17 +296,8 @@ if (!isLoggedIn) {
         const rawId = document.getElementById('client-id')?.textContent?.trim();
         const googleClientId = rawId ? rawId : undefined;
 
-        if (googleClientId) {
-          window.PageTurnAuthClient = createAuthClient({
-            plugins: [
-              oneTapClient({
-                clientId: googleClientId,
-              }),
-            ],
-          });
-        } else {
-          window.PageTurnAuthClient = createAuthClient();
-        }
+        // Initialize auth client with proper plugins
+        window.PageTurnAuthClient = initAuthClient(googleClientId);
 
         // Setup logout functionality
         const logoutBtn = document.getElementById('logout-btn');
@@ -266,6 +310,28 @@ if (!isLoggedIn) {
               console.error('Failed to sign out:', error);
             }
           });
+        }
+
+        // Setup end impersonation functionality
+        const handleEndImpersonation = async () => {
+          try {
+            await window.PageTurnAuthClient.admin.stopImpersonating();
+            window.location.href = '/admin'; // Redirect back to admin
+          } catch (error) {
+            console.error('Failed to end impersonation:', error);
+            alert('Failed to end impersonation. Please try again.');
+          }
+        };
+
+        if (endImpersonationBtn) {
+          endImpersonationBtn.addEventListener('click', handleEndImpersonation);
+        }
+
+        if (menuEndImpersonationBtn) {
+          menuEndImpersonationBtn.addEventListener(
+            'click',
+            handleEndImpersonation
+          );
         }
 
         if (googleClientId) {
