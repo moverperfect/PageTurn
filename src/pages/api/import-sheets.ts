@@ -385,7 +385,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
       // Add sessions to the database
       // Create an array of promises for adding sessions
-      const sessionPromises = sessions.map(sessionData => addReadingSession(sessionData, locals.runtime.env));
+      const sessionPromises = sessions.map(sessionData => addReadingSession(sessionData, locals.runtime.env, locals.session.User.id));
 
       // Wait for all sessions to be added
       const addedSessions = await Promise.all(sessionPromises);

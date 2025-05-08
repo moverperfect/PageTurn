@@ -1,0 +1,653 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+// Check if current user is admin
+const session = Astro.locals.session;
+const currentUser = session?.User;
+
+if (!currentUser) {
+  return Astro.redirect('/login');
+}
+
+let isAdmin = Astro.locals.session?.User?.role === 'admin';
+
+// If not admin, redirect to home
+if (!isAdmin) {
+  return Astro.redirect('/');
+}
+---
+
+<Layout title="Admin Dashboard | PageTurn">
+  <h1>User Administration</h1>
+
+  <div class="card mb-8">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="mb-0">Users</h2>
+      <span id="user-count" class="text-sm text-gray-400">Loading users...</span
+      >
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Created</th>
+            <th>Role</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="users-table-body">
+          <tr>
+            <td colspan="5" class="text-center py-4">Loading users...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Sessions Modal -->
+  <div
+    id="sessionsModal"
+    class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden"
+  >
+    <div
+      class="bg-slate-800 rounded-lg p-6 max-w-3xl w-full border border-slate-700"
+    >
+      <div class="flex justify-between items-center mb-4">
+        <h3 id="sessionsModalTitle" class="text-xl font-bold">User Sessions</h3>
+        <button id="closeSessionsBtn" class="text-gray-400 hover:text-white">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div id="sessionsContent" class="max-h-[70vh] overflow-y-auto">
+        <table class="w-full">
+          <thead>
+            <tr>
+              <th>Device</th>
+              <th>IP Address</th>
+              <th>Created</th>
+              <th>Expires</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="sessionsTableBody">
+            <!-- Sessions will be loaded here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div
+    id="confirmationModal"
+    class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden"
+  >
+    <div
+      class="bg-slate-800 rounded-lg p-6 max-w-md w-full border border-slate-700"
+    >
+      <h3 id="modalTitle" class="text-xl font-bold mb-4">Confirm Action</h3>
+      <p id="modalMessage" class="mb-6 text-gray-300">
+        Are you sure you want to perform this action?
+      </p>
+      <div class="flex justify-end gap-3">
+        <button id="cancelBtn" class="btn-secondary">Cancel</button>
+        <button id="confirmBtn" class="btn bg-red-600 hover:bg-red-700"
+          >Confirm</button
+        >
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { parseUserAgent } from '../../utils/userAgent';
+
+  let actionUserId = '';
+  let actionType = '';
+
+  // Reference to UI elements
+  const userCountElement = document.getElementById('user-count');
+  const usersTableBody = document.getElementById('users-table-body');
+  const confirmationModal = document.getElementById('confirmationModal');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalMessage = document.getElementById('modalMessage');
+  const confirmBtn = document.getElementById('confirmBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+
+  // Reference to sessions modal elements
+  const sessionsModal = document.getElementById('sessionsModal');
+  const sessionsModalTitle = document.getElementById('sessionsModalTitle');
+  const closeSessionsBtn = document.getElementById('closeSessionsBtn');
+  const sessionsTableBody = document.getElementById('sessionsTableBody');
+
+  // Load users on page load
+  document.addEventListener('DOMContentLoaded', () => {
+    loadUsers();
+  });
+
+  async function loadUsers() {
+    try {
+      const response = await window.PageTurnAuthClient.admin.listUsers({
+        query: {
+          sortBy: 'createdAt',
+          sortDirection: 'asc',
+        },
+      });
+
+      // Update the user count
+      if (userCountElement && response.data.total !== undefined) {
+        userCountElement.textContent = `Total: ${response.data.total} users`;
+      }
+
+      // Only proceed if we have a table body and users
+      if (
+        !usersTableBody ||
+        !response.data.users ||
+        !response.data.users.length
+      ) {
+        if (usersTableBody) {
+          usersTableBody.innerHTML =
+            '<tr><td colspan="5" class="text-center py-4">No users found</td></tr>';
+        }
+        return;
+      }
+
+      // Get current user to disable self-impersonation
+      const currentSession = await window.PageTurnAuthClient.getSession();
+      const currentUserId = currentSession?.data?.user?.id;
+
+      // Render the users
+      // Create DOM elements safely instead of using innerHTML with template literals
+      usersTableBody.replaceChildren(
+        ...response.data.users.map((user: any) => {
+          const tr = document.createElement('tr');
+          tr.dataset.userId = user.id;
+
+          // Name cell with avatar
+          const nameTd = document.createElement('td');
+          nameTd.className = 'flex items-center gap-2';
+
+          // Create avatar
+          if (user.image) {
+            const img = document.createElement('img');
+            img.src = user.image;
+            img.alt = '';
+            img.className = 'w-6 h-6 rounded-full';
+            nameTd.appendChild(img);
+          } else {
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className =
+              'w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs';
+            avatarDiv.textContent =
+              user.name?.charAt(0) || user.email?.charAt(0) || '?';
+            nameTd.appendChild(avatarDiv);
+          }
+
+          // Add name text
+          const nameText = document.createTextNode(user.name || '');
+          nameTd.appendChild(nameText);
+          tr.appendChild(nameTd);
+
+          // Email cell
+          const emailTd = document.createElement('td');
+          emailTd.textContent = user.email || '';
+          tr.appendChild(emailTd);
+
+          // Created date cell
+          const dateTd = document.createElement('td');
+          dateTd.textContent = new Date(user.createdAt).toLocaleDateString();
+          tr.appendChild(dateTd);
+
+          // Role cell
+          const roleTd = document.createElement('td');
+          const roleSpan = document.createElement('span');
+          roleSpan.className =
+            'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-800 text-indigo-200';
+          roleSpan.textContent = user.role || 'user';
+          roleTd.appendChild(roleSpan);
+          tr.appendChild(roleTd);
+
+          // Actions cell
+          const actionsTd = document.createElement('td');
+          const actionsDiv = document.createElement('div');
+          actionsDiv.className = 'flex gap-2';
+
+          // Sessions button
+          const sessionsBtn = document.createElement('button');
+          sessionsBtn.className =
+            'view-sessions-btn text-xs px-2 py-1 bg-blue-700 hover:bg-blue-600 text-white rounded';
+          sessionsBtn.dataset.userId = user.id;
+          sessionsBtn.textContent = 'Sessions';
+          actionsDiv.appendChild(sessionsBtn);
+
+          // Make admin button
+          const adminBtn = document.createElement('button');
+          adminBtn.className =
+            'make-admin-btn text-xs px-2 py-1 bg-green-700 hover:bg-green-600 text-white rounded';
+          adminBtn.dataset.userId = user.id;
+          adminBtn.dataset.userRole = user.role || 'user';
+          adminBtn.textContent =
+            user.role === 'admin' ? 'Remove Admin' : 'Make Admin';
+          actionsDiv.appendChild(adminBtn);
+
+          // Impersonate button
+          const impersonateBtn = document.createElement('button');
+          impersonateBtn.className =
+            'impersonate-btn text-xs px-2 py-1 bg-purple-700 hover:bg-purple-600 text-white rounded';
+          impersonateBtn.dataset.userId = user.id;
+          impersonateBtn.textContent = 'Impersonate';
+
+          if (user.id === currentUserId) {
+            impersonateBtn.disabled = true;
+            impersonateBtn.title = 'Cannot impersonate yourself';
+            impersonateBtn.style.opacity = '0.5';
+            impersonateBtn.style.cursor = 'not-allowed';
+          }
+
+          actionsDiv.appendChild(impersonateBtn);
+
+          // Logout button
+          const logoutBtn = document.createElement('button');
+          logoutBtn.className =
+            'logout-user-btn text-xs px-2 py-1 bg-amber-700 hover:bg-amber-600 text-white rounded';
+          logoutBtn.dataset.userId = user.id;
+          logoutBtn.textContent = 'Log Out';
+          actionsDiv.appendChild(logoutBtn);
+
+          // Delete button
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className =
+            'delete-user-btn text-xs px-2 py-1 bg-red-700 hover:bg-red-600 text-white rounded';
+          deleteBtn.dataset.userId = user.id;
+          deleteBtn.textContent = 'Delete';
+          actionsDiv.appendChild(deleteBtn);
+
+          actionsTd.appendChild(actionsDiv);
+          tr.appendChild(actionsTd);
+
+          return tr;
+        })
+      );
+
+      // No need to check for data-has-listeners since we use event delegation
+      setupButtonEventListeners();
+    } catch (error) {
+      console.error('Error loading users:', error);
+      if (usersTableBody) {
+        usersTableBody.innerHTML =
+          '<tr><td colspan="5" class="text-center py-4 text-red-400">Failed to load users</td></tr>';
+      }
+    }
+  }
+
+  function setupButtonEventListeners() {
+    // Use event delegation with a single listener on the document
+    document.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      const btn = target.closest('button');
+
+      if (!btn) return;
+
+      // Skip disabled buttons
+      if (btn.hasAttribute('disabled')) return;
+
+      const userId = btn.getAttribute('data-user-id') || '';
+
+      if (btn.classList.contains('logout-user-btn')) {
+        actionUserId = userId;
+        actionType = 'logout';
+        showConfirmationModal(
+          'Log Out User',
+          'Are you sure you want to terminate all sessions for this user?'
+        );
+      } else if (btn.classList.contains('delete-user-btn')) {
+        actionUserId = userId;
+        actionType = 'delete';
+        showConfirmationModal(
+          'Delete User',
+          'Are you sure you want to permanently delete this user? This action cannot be undone.'
+        );
+      } else if (btn.classList.contains('make-admin-btn')) {
+        const currentRole = btn.getAttribute('data-user-role') || 'user';
+        const newRole = currentRole === 'admin' ? 'user' : 'admin';
+        const actionText =
+          newRole === 'admin'
+            ? 'promote this user to admin'
+            : 'remove admin privileges from this user';
+
+        actionUserId = userId;
+        actionType = 'role';
+
+        showConfirmationModal(
+          newRole === 'admin' ? 'Make Admin' : 'Remove Admin',
+          `Are you sure you want to ${actionText}?`
+        );
+      } else if (btn.classList.contains('impersonate-btn')) {
+        actionUserId = userId;
+        actionType = 'impersonate';
+        showConfirmationModal(
+          'Impersonate User',
+          'You will be temporarily signed in as this user. Are you sure you want to continue?'
+        );
+      } else if (btn.classList.contains('view-sessions-btn')) {
+        showUserSessions(userId);
+      }
+    });
+  }
+
+  // Modal controls
+  function showConfirmationModal(title: string, message: string) {
+    if (modalTitle) modalTitle.textContent = title;
+    if (modalMessage) modalMessage.textContent = message;
+    confirmationModal?.classList.remove('hidden');
+  }
+
+  function hideConfirmationModal() {
+    confirmationModal?.classList.add('hidden');
+    actionUserId = '';
+    actionType = '';
+  }
+
+  cancelBtn?.addEventListener('click', hideConfirmationModal);
+
+  confirmBtn?.addEventListener('click', async () => {
+    if (!actionUserId || !actionType) {
+      hideConfirmationModal();
+      return;
+    }
+
+    try {
+      if (actionType === 'logout') {
+        await window.PageTurnAuthClient.admin.revokeUserSessions({
+          userId: actionUserId,
+        });
+
+        // Update UI - for simplicity, add a revoked class to show the sessions are revoked
+        const userRow = document.querySelector(
+          `tr[data-user-id="${actionUserId}"]`
+        );
+        if (userRow) {
+          userRow.classList.add('opacity-75');
+        }
+
+        // Add success notification
+        const successToast = document.createElement('div');
+        successToast.className =
+          'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg';
+        successToast.textContent = `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} action completed successfully`;
+        document.querySelector('footer')?.appendChild(successToast) ||
+          document.body.appendChild(successToast);
+        setTimeout(() => successToast.remove(), 5000);
+      } else if (actionType === 'delete') {
+        await window.PageTurnAuthClient.admin.removeUser({
+          userId: actionUserId,
+        });
+
+        // Remove row from table
+        const userRow = document.querySelector(
+          `tr[data-user-id="${actionUserId}"]`
+        );
+        userRow?.remove();
+
+        // Update the count
+        if (userCountElement) {
+          const countText = userCountElement.textContent || '';
+          const countMatch = countText.match(/Total: (\d+) users/);
+          if (countMatch && countMatch[1]) {
+            const currentCount = parseInt(countMatch[1], 10);
+            if (!isNaN(currentCount)) {
+              userCountElement.textContent = `Total: ${currentCount - 1} users`;
+            }
+          }
+        }
+
+        // Add success notification
+        const successToast = document.createElement('div');
+        successToast.className =
+          'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg';
+        successToast.textContent = `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} action completed successfully`;
+        document.querySelector('footer')?.appendChild(successToast) ||
+          document.body.appendChild(successToast);
+        setTimeout(() => successToast.remove(), 5000);
+      } else if (actionType === 'role') {
+        const userRow = document.querySelector(
+          `tr[data-user-id="${actionUserId}"]`
+        );
+        const roleCell = userRow?.querySelector('td:nth-child(4) span');
+        const roleBtn = userRow?.querySelector('.make-admin-btn');
+
+        const currentRole = roleCell?.textContent?.trim() || 'user';
+        const newRole = currentRole === 'admin' ? 'user' : 'admin';
+
+        await window.PageTurnAuthClient.admin.setRole({
+          userId: actionUserId,
+          role: newRole,
+        });
+
+        // Update UI
+        if (roleCell) roleCell.textContent = newRole;
+        if (roleBtn) {
+          roleBtn.textContent =
+            newRole === 'admin' ? 'Remove Admin' : 'Make Admin';
+          roleBtn.setAttribute('data-user-role', newRole);
+        }
+
+        // Add success notification
+        const successToast = document.createElement('div');
+        successToast.className =
+          'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg';
+        successToast.textContent = `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} action completed successfully`;
+        document.querySelector('footer')?.appendChild(successToast) ||
+          document.body.appendChild(successToast);
+        setTimeout(() => successToast.remove(), 5000);
+      } else if (actionType === 'impersonate') {
+        // Start impersonation
+        await window.PageTurnAuthClient.admin.impersonateUser({
+          userId: actionUserId,
+        });
+
+        // Show loading state during transition
+        document.body.classList.add('impersonating');
+        const loadingElement = document.createElement('div');
+        loadingElement.className =
+          'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center';
+        loadingElement.innerHTML =
+          '<div class="bg-slate-800 p-4 rounded text-white">Impersonating user...</div>';
+        document.body.appendChild(loadingElement);
+
+        // Give the session change time to process
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 500);
+      }
+
+      hideConfirmationModal();
+    } catch (error: any) {
+      console.error('Admin action failed:', error);
+      // Add a toast notification system
+      const errorToast = document.createElement('div');
+      errorToast.className =
+        'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded shadow-lg';
+      errorToast.textContent = `Operation failed: ${error.message || 'Please try again'}`;
+      document.querySelector('footer')?.appendChild(errorToast) ||
+        document.body.appendChild(errorToast);
+      setTimeout(() => errorToast.remove(), 5000);
+      hideConfirmationModal();
+    }
+  });
+
+  // Function to render sessions in the sessions table
+  function renderSessions(sessions: Session[]) {
+    if (!sessionsTableBody) return;
+
+    if (sessions && sessions.length > 0) {
+      // Create DOM elements safely instead of using innerHTML with template literals
+      sessionsTableBody.replaceChildren(
+        ...sessions.map((session: Session) => {
+          const tr = document.createElement('tr');
+          tr.dataset.sessionId = session.id;
+
+          // User agent cell
+          const userAgentTd = document.createElement('td');
+          const deviceInfo = parseUserAgent(session.userAgent || '');
+
+          const deviceInfoDiv = document.createElement('div');
+          deviceInfoDiv.className = 'flex items-center gap-2';
+
+          const iconSpan = document.createElement('span');
+          iconSpan.className = 'text-lg';
+          iconSpan.textContent = deviceInfo.icon;
+
+          const infoDiv = document.createElement('div');
+          const browserDiv = document.createElement('div');
+          browserDiv.className = 'font-medium';
+          browserDiv.textContent = `${deviceInfo.browser} on ${deviceInfo.os}`;
+
+          const deviceDiv = document.createElement('div');
+          deviceDiv.className = 'text-sm text-gray-400';
+          deviceDiv.textContent = deviceInfo.device;
+
+          infoDiv.appendChild(browserDiv);
+          infoDiv.appendChild(deviceDiv);
+
+          deviceInfoDiv.appendChild(iconSpan);
+          deviceInfoDiv.appendChild(infoDiv);
+
+          userAgentTd.appendChild(deviceInfoDiv);
+          tr.appendChild(userAgentTd);
+
+          // IP address cell
+          const ipTd = document.createElement('td');
+          ipTd.textContent = session.ipAddress || 'Unknown';
+          tr.appendChild(ipTd);
+
+          // Created date cell
+          const createdTd = document.createElement('td');
+          createdTd.textContent = new Date(session.createdAt).toLocaleString();
+          tr.appendChild(createdTd);
+
+          // Expires date cell
+          const expiresTd = document.createElement('td');
+          expiresTd.textContent = new Date(session.expiresAt).toLocaleString();
+          tr.appendChild(expiresTd);
+
+          // Actions cell
+          const actionsTd = document.createElement('td');
+          const revokeBtn = document.createElement('button');
+          revokeBtn.className =
+            'revoke-session-btn text-xs px-2 py-1 bg-amber-700 hover:bg-amber-600 text-white rounded';
+          revokeBtn.dataset.sessionToken = session.token;
+          revokeBtn.textContent = 'Revoke';
+          actionsTd.appendChild(revokeBtn);
+          tr.appendChild(actionsTd);
+
+          return tr;
+        })
+      );
+
+      // Use event delegation for session revocation
+      sessionsTableBody.addEventListener('click', async (event) => {
+        const target = event.target as HTMLElement;
+        if (target.classList.contains('revoke-session-btn')) {
+          const sessionToken = target.getAttribute('data-session-token');
+          if (sessionToken) {
+            try {
+              await window.PageTurnAuthClient.admin.revokeUserSession({
+                sessionToken: sessionToken,
+              });
+
+              // Remove row
+              const sessionRow = target.closest('tr');
+              sessionRow?.remove();
+            } catch (error) {
+              console.error('Failed to revoke session:', error);
+              alert('Failed to revoke session. Please try again.');
+            }
+          }
+        }
+      });
+    } else {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 5;
+      td.className = 'text-center';
+      td.textContent = 'No active sessions found';
+      tr.appendChild(td);
+      sessionsTableBody.replaceChildren(tr);
+    }
+  }
+
+  // Session modal management
+  async function showUserSessions(userId: string) {
+    try {
+      // Get user info for the title
+      const userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
+      const userName =
+        userRow?.querySelector('td:first-child')?.textContent?.trim() || '';
+      const userEmail =
+        userRow?.querySelector('td:nth-child(2)')?.textContent?.trim() || '';
+      const userIdentifier = userName || userEmail || `User ID: ${userId}`;
+
+      if (sessionsModalTitle) {
+        sessionsModalTitle.textContent = `Sessions for ${userIdentifier}`;
+      }
+
+      // Clear previous content
+      if (sessionsTableBody) {
+        sessionsTableBody.innerHTML =
+          '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
+      }
+
+      // Show modal
+      sessionsModal?.classList.remove('hidden');
+
+      // Get sessions
+      const response = await window.PageTurnAuthClient.admin.listUserSessions({
+        userId: userId,
+      });
+
+      // Populate table using the extracted function
+      renderSessions(response.data.sessions);
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      if (sessionsTableBody) {
+        sessionsTableBody.innerHTML =
+          '<tr><td colspan="5" class="text-center text-red-400">Failed to load sessions</td></tr>';
+      }
+    }
+  }
+
+  // Close sessions modal
+  closeSessionsBtn?.addEventListener('click', () => {
+    sessionsModal?.classList.add('hidden');
+  });
+
+  // Close sessions modal when clicking outside
+  sessionsModal?.addEventListener('click', (e) => {
+    if (e.target === sessionsModal) {
+      sessionsModal.classList.add('hidden');
+    }
+  });
+
+  // Close confirmation modal when clicking outside
+  confirmationModal?.addEventListener('click', (e) => {
+    if (e.target === confirmationModal) {
+      hideConfirmationModal();
+    }
+  });
+</script>

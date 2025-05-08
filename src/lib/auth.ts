@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { getDbClient } from "./db-client";
-import { oAuthProxy, oneTap } from "better-auth/plugins";
+import { admin, oAuthProxy, oneTap } from "better-auth/plugins";
 
 // Singleton auth client
 let authInstance: ReturnType<typeof betterAuth>;
@@ -21,6 +21,13 @@ export const auth = betterAuth({
     },
   },
   plugins: [
+    admin({
+      adminRoles: ["admin"],
+      defaultRole: "user",
+      impersonationSessionDuration: 60 * 60,
+      defaultBanReason: "Banned by administrator",
+      bannedUserMessage: "Your account has been suspended. Please contact support if you believe this is an error."
+    }),
     oAuthProxy({
       currentURL: process.env.CF_PAGES_URL,
       productionURL: process.env.BETTER_AUTH_URL,
@@ -67,7 +74,14 @@ export function getAuth(env: Env) {
           currentURL: env.CF_PAGES_URL || env.BETTER_AUTH_URL,
           productionURL: env.BETTER_AUTH_URL,
         }),
-        oneTap()
+        oneTap(),
+        admin({
+          adminRoles: ["admin"],
+          defaultRole: "user",
+          impersonationSessionDuration: 60 * 60,
+          defaultBanReason: "Banned by administrator",
+          bannedUserMessage: "Your account has been suspended. Please contact support if you believe this is an error."
+        })
       ]
     });
   }
