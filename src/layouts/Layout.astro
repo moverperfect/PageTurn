@@ -13,7 +13,7 @@ const isLoggedIn = !!session?.User;
 // @ts-ignore - impersonatedBy is added by the BetterAuth admin plugin
 const isImpersonating = !!session?.Session?.impersonatedBy;
 
-// Check if the current user is an admin (first registered user)
+// Check if the current user is an admin
 let isAdmin = Astro.locals.session?.User?.role === 'admin';
 
 let googleClientId;

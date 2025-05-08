@@ -162,6 +162,8 @@ if (!user) {
 </Layout>
 
 <script>
+  import type { Session } from 'better-auth/types';
+  import { parseUserAgent } from '../utils/userAgent';
   // Toggle update form visibility
   const updateProfileBtn = document.getElementById('update-profile');
   const updateFormContainer = document.getElementById('update-form-container');
@@ -225,11 +227,21 @@ if (!user) {
         const sessions = response.data.sessions;
         if (sessions && sessions.length > 0) {
           sessionsTableBody.innerHTML = sessions
-            .map((session) => {
+            .map((session: Session) => {
               const isCurrent = session.token === currentSessionToken;
+              const deviceInfo = parseUserAgent(session.userAgent || '');
               return `
               <tr data-session-id="${session.id}" class="${isCurrent ? 'bg-slate-700/30' : ''}">
-                <td>${session.userAgent || 'Unknown'} ${isCurrent ? '<span class="ml-2 text-xs text-green-400">(Current)</span>' : ''}</td>
+                <td>
+                  <div class="flex items-center gap-2">
+                    <span class="text-lg">${deviceInfo.icon}</span>
+                    <div>
+                      <div class="font-medium">${deviceInfo.browser} on ${deviceInfo.os}</div>
+                      <div class="text-sm text-gray-400">${deviceInfo.device}</div>
+                    </div>
+                    ${isCurrent ? '<span class="ml-2 text-xs text-green-400">(Current)</span>' : ''}
+                  </div>
+                </td>
                 <td>${session.ipAddress || 'Unknown'}</td>
                 <td>${new Date(session.createdAt).toLocaleString()}</td>
                 <td>
@@ -294,6 +306,26 @@ if (!user) {
       name: formData.get('name'),
       image: formData.get('image'),
     };
+
+    // Client-side validation
+    if (!userData.name) {
+      alert('Name cannot be empty');
+      return;
+    }
+
+    // Validate image URL if provided
+    if (
+      userData.image &&
+      typeof userData.image === 'string' &&
+      userData.image.trim() !== ''
+    ) {
+      try {
+        new URL(userData.image);
+      } catch (e) {
+        alert('Please enter a valid URL for the profile image');
+        return;
+      }
+    }
 
     try {
       // Get current user session

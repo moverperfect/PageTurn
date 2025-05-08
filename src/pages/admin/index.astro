@@ -115,6 +115,8 @@ if (!isAdmin) {
 </Layout>
 
 <script>
+  import { parseUserAgent } from '../../utils/userAgent';
+
   let actionUserId = '';
   let actionType = '';
 
@@ -282,11 +284,8 @@ if (!isAdmin) {
         })
       );
 
-      // Use event delegation instead of attaching listeners to each button
-      if (!usersTableBody.hasAttribute('data-has-listeners')) {
-        setupButtonEventListeners();
-        usersTableBody.setAttribute('data-has-listeners', 'true');
-      }
+      // No need to check for data-has-listeners since we use event delegation
+      setupButtonEventListeners();
     } catch (error) {
       console.error('Error loading users:', error);
       if (usersTableBody) {
@@ -297,32 +296,33 @@ if (!isAdmin) {
   }
 
   function setupButtonEventListeners() {
-    // Add event listeners to buttons
-    document.querySelectorAll('.logout-user-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        actionUserId = btn.getAttribute('data-user-id') || '';
+    // Use event delegation with a single listener on the document
+    document.addEventListener('click', (event) => {
+      const target = event.target as HTMLElement;
+      const btn = target.closest('button');
+
+      if (!btn) return;
+
+      // Skip disabled buttons
+      if (btn.hasAttribute('disabled')) return;
+
+      const userId = btn.getAttribute('data-user-id') || '';
+
+      if (btn.classList.contains('logout-user-btn')) {
+        actionUserId = userId;
         actionType = 'logout';
         showConfirmationModal(
           'Log Out User',
           'Are you sure you want to terminate all sessions for this user?'
         );
-      });
-    });
-
-    document.querySelectorAll('.delete-user-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        actionUserId = btn.getAttribute('data-user-id') || '';
+      } else if (btn.classList.contains('delete-user-btn')) {
+        actionUserId = userId;
         actionType = 'delete';
         showConfirmationModal(
           'Delete User',
           'Are you sure you want to permanently delete this user? This action cannot be undone.'
         );
-      });
-    });
-
-    document.querySelectorAll('.make-admin-btn').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const userId = btn.getAttribute('data-user-id') || '';
+      } else if (btn.classList.contains('make-admin-btn')) {
         const currentRole = btn.getAttribute('data-user-role') || 'user';
         const newRole = currentRole === 'admin' ? 'user' : 'admin';
         const actionText =
@@ -337,27 +337,16 @@ if (!isAdmin) {
           newRole === 'admin' ? 'Make Admin' : 'Remove Admin',
           `Are you sure you want to ${actionText}?`
         );
-      });
-    });
-
-    document.querySelectorAll('.impersonate-btn').forEach((btn) => {
-      if (!btn.hasAttribute('disabled')) {
-        btn.addEventListener('click', () => {
-          actionUserId = btn.getAttribute('data-user-id') || '';
-          actionType = 'impersonate';
-          showConfirmationModal(
-            'Impersonate User',
-            'You will be temporarily signed in as this user. Are you sure you want to continue?'
-          );
-        });
+      } else if (btn.classList.contains('impersonate-btn')) {
+        actionUserId = userId;
+        actionType = 'impersonate';
+        showConfirmationModal(
+          'Impersonate User',
+          'You will be temporarily signed in as this user. Are you sure you want to continue?'
+        );
+      } else if (btn.classList.contains('view-sessions-btn')) {
+        showUserSessions(userId);
       }
-    });
-
-    document.querySelectorAll('.view-sessions-btn').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const userId = btn.getAttribute('data-user-id') || '';
-        await showUserSessions(userId);
-      });
     });
   }
 
@@ -395,6 +384,15 @@ if (!isAdmin) {
         if (userRow) {
           userRow.classList.add('opacity-75');
         }
+
+        // Add success notification
+        const successToast = document.createElement('div');
+        successToast.className =
+          'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg';
+        successToast.textContent = `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} action completed successfully`;
+        document.querySelector('footer')?.appendChild(successToast) ||
+          document.body.appendChild(successToast);
+        setTimeout(() => successToast.remove(), 5000);
       } else if (actionType === 'delete') {
         await window.PageTurnAuthClient.admin.removeUser({
           userId: actionUserId,
@@ -417,6 +415,15 @@ if (!isAdmin) {
             }
           }
         }
+
+        // Add success notification
+        const successToast = document.createElement('div');
+        successToast.className =
+          'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg';
+        successToast.textContent = `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} action completed successfully`;
+        document.querySelector('footer')?.appendChild(successToast) ||
+          document.body.appendChild(successToast);
+        setTimeout(() => successToast.remove(), 5000);
       } else if (actionType === 'role') {
         const userRow = document.querySelector(
           `tr[data-user-id="${actionUserId}"]`
@@ -439,23 +446,151 @@ if (!isAdmin) {
             newRole === 'admin' ? 'Remove Admin' : 'Make Admin';
           roleBtn.setAttribute('data-user-role', newRole);
         }
+
+        // Add success notification
+        const successToast = document.createElement('div');
+        successToast.className =
+          'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg';
+        successToast.textContent = `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} action completed successfully`;
+        document.querySelector('footer')?.appendChild(successToast) ||
+          document.body.appendChild(successToast);
+        setTimeout(() => successToast.remove(), 5000);
       } else if (actionType === 'impersonate') {
         // Start impersonation
         await window.PageTurnAuthClient.admin.impersonateUser({
           userId: actionUserId,
         });
 
-        // Redirect to the home page as the impersonated user
-        window.location.href = '/';
+        // Show loading state during transition
+        document.body.classList.add('impersonating');
+        const loadingElement = document.createElement('div');
+        loadingElement.className =
+          'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center';
+        loadingElement.innerHTML =
+          '<div class="bg-slate-800 p-4 rounded text-white">Impersonating user...</div>';
+        document.body.appendChild(loadingElement);
+
+        // Give the session change time to process
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 500);
       }
 
       hideConfirmationModal();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Admin action failed:', error);
-      alert('Operation failed. Please try again.');
+      // Add a toast notification system
+      const errorToast = document.createElement('div');
+      errorToast.className =
+        'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded shadow-lg';
+      errorToast.textContent = `Operation failed: ${error.message || 'Please try again'}`;
+      document.querySelector('footer')?.appendChild(errorToast) ||
+        document.body.appendChild(errorToast);
+      setTimeout(() => errorToast.remove(), 5000);
       hideConfirmationModal();
     }
   });
+
+  // Function to render sessions in the sessions table
+  function renderSessions(sessions: Session[]) {
+    if (!sessionsTableBody) return;
+
+    if (sessions && sessions.length > 0) {
+      // Create DOM elements safely instead of using innerHTML with template literals
+      sessionsTableBody.replaceChildren(
+        ...sessions.map((session: Session) => {
+          const tr = document.createElement('tr');
+          tr.dataset.sessionId = session.id;
+
+          // User agent cell
+          const userAgentTd = document.createElement('td');
+          const deviceInfo = parseUserAgent(session.userAgent || '');
+
+          const deviceInfoDiv = document.createElement('div');
+          deviceInfoDiv.className = 'flex items-center gap-2';
+
+          const iconSpan = document.createElement('span');
+          iconSpan.className = 'text-lg';
+          iconSpan.textContent = deviceInfo.icon;
+
+          const infoDiv = document.createElement('div');
+          const browserDiv = document.createElement('div');
+          browserDiv.className = 'font-medium';
+          browserDiv.textContent = `${deviceInfo.browser} on ${deviceInfo.os}`;
+
+          const deviceDiv = document.createElement('div');
+          deviceDiv.className = 'text-sm text-gray-400';
+          deviceDiv.textContent = deviceInfo.device;
+
+          infoDiv.appendChild(browserDiv);
+          infoDiv.appendChild(deviceDiv);
+
+          deviceInfoDiv.appendChild(iconSpan);
+          deviceInfoDiv.appendChild(infoDiv);
+
+          userAgentTd.appendChild(deviceInfoDiv);
+          tr.appendChild(userAgentTd);
+
+          // IP address cell
+          const ipTd = document.createElement('td');
+          ipTd.textContent = session.ipAddress || 'Unknown';
+          tr.appendChild(ipTd);
+
+          // Created date cell
+          const createdTd = document.createElement('td');
+          createdTd.textContent = new Date(session.createdAt).toLocaleString();
+          tr.appendChild(createdTd);
+
+          // Expires date cell
+          const expiresTd = document.createElement('td');
+          expiresTd.textContent = new Date(session.expiresAt).toLocaleString();
+          tr.appendChild(expiresTd);
+
+          // Actions cell
+          const actionsTd = document.createElement('td');
+          const revokeBtn = document.createElement('button');
+          revokeBtn.className =
+            'revoke-session-btn text-xs px-2 py-1 bg-amber-700 hover:bg-amber-600 text-white rounded';
+          revokeBtn.dataset.sessionToken = session.token;
+          revokeBtn.textContent = 'Revoke';
+          actionsTd.appendChild(revokeBtn);
+          tr.appendChild(actionsTd);
+
+          return tr;
+        })
+      );
+
+      // Use event delegation for session revocation
+      sessionsTableBody.addEventListener('click', async (event) => {
+        const target = event.target as HTMLElement;
+        if (target.classList.contains('revoke-session-btn')) {
+          const sessionToken = target.getAttribute('data-session-token');
+          if (sessionToken) {
+            try {
+              await window.PageTurnAuthClient.admin.revokeUserSession({
+                sessionToken: sessionToken,
+              });
+
+              // Remove row
+              const sessionRow = target.closest('tr');
+              sessionRow?.remove();
+            } catch (error) {
+              console.error('Failed to revoke session:', error);
+              alert('Failed to revoke session. Please try again.');
+            }
+          }
+        }
+      });
+    } else {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 5;
+      td.className = 'text-center';
+      td.textContent = 'No active sessions found';
+      tr.appendChild(td);
+      sessionsTableBody.replaceChildren(tr);
+    }
+  }
 
   // Session modal management
   async function showUserSessions(userId: string) {
@@ -463,10 +598,13 @@ if (!isAdmin) {
       // Get user info for the title
       const userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
       const userName =
-        userRow?.querySelector('td:first-child')?.textContent?.trim() || 'User';
+        userRow?.querySelector('td:first-child')?.textContent?.trim() || '';
+      const userEmail =
+        userRow?.querySelector('td:nth-child(2)')?.textContent?.trim() || '';
+      const userIdentifier = userName || userEmail || `User ID: ${userId}`;
 
       if (sessionsModalTitle) {
-        sessionsModalTitle.textContent = `Sessions for ${userName}`;
+        sessionsModalTitle.textContent = `Sessions for ${userIdentifier}`;
       }
 
       // Clear previous content
@@ -483,84 +621,8 @@ if (!isAdmin) {
         userId: userId,
       });
 
-      // Populate table
-      if (sessionsTableBody) {
-        const sessions = response.data.sessions;
-        if (sessions && sessions.length > 0) {
-          // Create DOM elements safely instead of using innerHTML with template literals
-          sessionsTableBody.replaceChildren(
-            ...sessions.map((session: any) => {
-              const tr = document.createElement('tr');
-              tr.dataset.sessionId = session.id;
-
-              // User agent cell
-              const userAgentTd = document.createElement('td');
-              userAgentTd.textContent = session.userAgent || 'Unknown';
-              tr.appendChild(userAgentTd);
-
-              // IP address cell
-              const ipTd = document.createElement('td');
-              ipTd.textContent = session.ipAddress || 'Unknown';
-              tr.appendChild(ipTd);
-
-              // Created date cell
-              const createdTd = document.createElement('td');
-              createdTd.textContent = new Date(
-                session.createdAt
-              ).toLocaleString();
-              tr.appendChild(createdTd);
-
-              // Expires date cell
-              const expiresTd = document.createElement('td');
-              expiresTd.textContent = new Date(
-                session.expiresAt
-              ).toLocaleString();
-              tr.appendChild(expiresTd);
-
-              // Actions cell
-              const actionsTd = document.createElement('td');
-              const revokeBtn = document.createElement('button');
-              revokeBtn.className =
-                'revoke-session-btn text-xs px-2 py-1 bg-amber-700 hover:bg-amber-600 text-white rounded';
-              revokeBtn.dataset.sessionToken = session.token;
-              revokeBtn.textContent = 'Revoke';
-              actionsTd.appendChild(revokeBtn);
-              tr.appendChild(actionsTd);
-
-              return tr;
-            })
-          );
-
-          // Add event listeners to revoke buttons
-          document.querySelectorAll('.revoke-session-btn').forEach((btn) => {
-            btn.addEventListener('click', async () => {
-              const sessionToken = btn.getAttribute('data-session-token');
-              if (sessionToken) {
-                try {
-                  await window.PageTurnAuthClient.admin.revokeUserSession({
-                    sessionToken: sessionToken,
-                  });
-
-                  // Remove row
-                  const sessionRow = btn.closest('tr');
-                  sessionRow?.remove();
-                } catch (error) {
-                  console.error('Failed to revoke session:', error);
-                  alert('Failed to revoke session. Please try again.');
-                }
-              }
-            });
-          });
-        } else {
-          const tr = document.createElement('tr');
-          const td = document.createElement('td');
-          td.colSpan = 5;
-          td.className = 'text-center';
-          td.textContent = 'No active sessions found';
-          tr.appendChild(td);
-          sessionsTableBody.replaceChildren(tr);
-        }
-      }
+      // Populate table using the extracted function
+      renderSessions(response.data.sessions);
     } catch (error) {
       console.error('Failed to load sessions:', error);
       if (sessionsTableBody) {
