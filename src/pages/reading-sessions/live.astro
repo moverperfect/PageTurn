@@ -1,0 +1,970 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getAllBooks, getAllBooksForUser } from '../../lib/db';
+
+// Get all books for the current user that are not finished
+let books = [];
+if (Astro.locals.session?.User?.id) {
+  const userId = Astro.locals.session.User.id;
+  const allBooks = await getAllBooksForUser(userId, Astro.locals.runtime.env);
+  // Filter out finished books
+  books = allBooks.filter((book) => !book.finished);
+} else {
+  books = [];
+}
+
+// Get bookId from URL query parameters
+const bookId = Astro.url.searchParams.get('bookid') || '';
+---
+
+<Layout title="Live Reading Session | PageTurn">
+  <div class="max-w-3xl mx-auto">
+    <h1 class="text-2xl md:text-3xl font-bold mb-6">Live Reading Session</h1>
+
+    {
+      books.length === 0 ? (
+        <div class="card text-center py-12 mt-6">
+          <h2 class="text-xl font-semibold mb-3">No books available</h2>
+          <p class="mb-6 text-gray-300">
+            {Astro.locals.session?.User
+              ? "You don't have any unfinished books in your library. Add a new book or mark an existing book as unfinished."
+              : 'You need to add books to your library before you can track reading sessions.'}
+          </p>
+          <div class="flex flex-col sm:flex-row justify-center gap-4">
+            <a href="/books/new" class="btn">
+              Add a New Book
+            </a>
+            <a href="/books" class="btn-secondary">
+              View Your Library
+            </a>
+          </div>
+        </div>
+      ) : (
+        <div class="card bg-slate-800/50 border border-slate-700 p-6 mt-6">
+          <div class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label for="bookId" class="form-label block mb-2">
+                  Book
+                </label>
+                <select
+                  id="bookId"
+                  name="bookId"
+                  required
+                  class="form-input w-full"
+                >
+                  <option value="">Select a book</option>
+                  {books.map((book) => (
+                    <option value={book.id} selected={book.id === bookId}>
+                      {book.title} by {book.author}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label for="startPage" class="form-label block mb-2">
+                  Starting Page
+                </label>
+                <input
+                  type="number"
+                  id="startPage"
+                  name="startPage"
+                  min="1"
+                  class="form-input w-full"
+                  placeholder="Enter your current page"
+                />
+                <p
+                  id="suggestedPage"
+                  class="text-xs text-indigo-300 mt-1 hidden"
+                >
+                  Suggested from your previous reading session
+                </p>
+              </div>
+            </div>
+
+            <div
+              id="timerControls"
+              class="flex flex-col items-center space-y-8 my-8 py-6 bg-slate-900/50 rounded-lg border border-slate-700"
+            >
+              <div
+                class="text-5xl md:text-7xl font-mono font-bold tracking-wide text-center text-indigo-400"
+                id="timerDisplay"
+              >
+                00:00:00
+              </div>
+
+              <div class="flex flex-wrap justify-center gap-4">
+                <button
+                  id="toggleBtn"
+                  class="btn-success px-6 py-3 rounded-md flex items-center justify-center min-w-32"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-5 w-5 mr-2"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  Start Reading
+                </button>
+                <button
+                  id="stopBtn"
+                  class="btn-secondary px-6 py-3 rounded-md flex items-center justify-center min-w-32"
+                  disabled
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-5 w-5 mr-2"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  Stop
+                </button>
+                <button
+                  id="cancelBtn"
+                  class="btn-danger px-6 py-3 rounded-md flex items-center justify-center min-w-32"
+                  disabled
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-5 w-5 mr-2"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  Cancel
+                </button>
+              </div>
+
+              <div id="read-status" class="text-sm text-indigo-300 hidden">
+                <p>
+                  Session in progress... Timer will continue even if you lock
+                  your phone.
+                </p>
+              </div>
+            </div>
+
+            <div
+              id="finishSection"
+              class="bg-slate-800 border border-slate-700 rounded-lg p-6 mt-8 hidden"
+            >
+              <h3 class="text-xl font-medium mb-4 text-indigo-200">
+                Complete Session
+              </h3>
+
+              <div class="space-y-6">
+                <div>
+                  <label for="endPage" class="form-label block mb-2">
+                    Ending Page
+                  </label>
+                  <input
+                    type="number"
+                    id="endPage"
+                    name="endPage"
+                    min="1"
+                    class="form-input w-full"
+                    placeholder="Enter your ending page"
+                  />
+                </div>
+
+                <div class="pt-2">
+                  <label class="inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="finished"
+                      name="finished"
+                      class="form-checkbox h-5 w-5"
+                    />
+                    <span class="ml-2">I finished the book</span>
+                  </label>
+                </div>
+
+                <div
+                  id="stats"
+                  class="mt-6 space-y-3 p-4 bg-indigo-900/20 border border-indigo-800/50 rounded-lg hidden"
+                >
+                  <h4 class="font-medium text-indigo-300">
+                    Reading Statistics
+                  </h4>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="flex items-center">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-5 w-5 mr-2 text-indigo-400"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
+                      </svg>
+                      <div>
+                        <div class="text-sm text-gray-400">Pages read</div>
+                        <div class="text-lg font-medium" id="pagesReadStat">
+                          -
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex items-center">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-5 w-5 mr-2 text-indigo-400"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                      <div>
+                        <div class="text-sm text-gray-400">Time read</div>
+                        <div class="text-lg font-medium" id="timeReadStat">
+                          -
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex items-center">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-5 w-5 mr-2 text-indigo-400"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M6.672 1.911a1 1 0 10-1.932.518l.259.966a1 1 0 001.932-.518l-.26-.966zM2.429 4.74a1 1 0 10-.517 1.932l.966.259a1 1 0 00.517-1.932l-.966-.26zm8.814-.569a1 1 0 00-1.415-1.414l-.707.707a1 1 0 101.415 1.415l.707-.708zm-7.071 7.072l.707-.707A1 1 0 003.465 9.12l-.708.707a1 1 0 001.415 1.415zm3.2-5.171a1 1 0 00-1.3 1.3l4 10a1 1 0 001.823.075l1.38-2.759 3.018 3.02a1 1 0 001.414-1.415l-3.019-3.02 2.76-1.379a1 1 0 00-.076-1.822l-10-4z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                      <div>
+                        <div class="text-sm text-gray-400">Pages per hour</div>
+                        <div class="text-lg font-medium" id="pagesPerHourStat">
+                          -
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex items-center">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-5 w-5 mr-2 text-indigo-400"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                      <div>
+                        <div class="text-sm text-gray-400">
+                          Minutes per page
+                        </div>
+                        <div
+                          class="text-lg font-medium"
+                          id="minutesPerPageStat"
+                        >
+                          -
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex justify-end space-x-4 pt-4">
+                  <button
+                    id="saveBtn"
+                    class="btn px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 transition-colors rounded-md font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600"
+                    disabled
+                  >
+                    Save Session
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+  </div>
+</Layout>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // DOM Elements
+    const bookIdSelect = document.getElementById(
+      'bookId'
+    ) as HTMLSelectElement | null;
+    const startPageInput = document.getElementById(
+      'startPage'
+    ) as HTMLInputElement | null;
+    const endPageInput = document.getElementById(
+      'endPage'
+    ) as HTMLInputElement | null;
+    const finishedCheckbox = document.getElementById(
+      'finished'
+    ) as HTMLInputElement | null;
+    const timerDisplay = document.getElementById(
+      'timerDisplay'
+    ) as HTMLElement | null;
+    const readStatus = document.getElementById(
+      'read-status'
+    ) as HTMLElement | null;
+    const suggestedPageMsg = document.getElementById(
+      'suggestedPage'
+    ) as HTMLElement | null;
+
+    // Timer Controls
+    const toggleBtn = document.getElementById(
+      'toggleBtn'
+    ) as HTMLButtonElement | null;
+    const stopBtn = document.getElementById(
+      'stopBtn'
+    ) as HTMLButtonElement | null;
+    const cancelBtn = document.getElementById(
+      'cancelBtn'
+    ) as HTMLButtonElement | null;
+    const saveBtn = document.getElementById(
+      'saveBtn'
+    ) as HTMLButtonElement | null;
+
+    // Sections
+    const finishSection = document.getElementById(
+      'finishSection'
+    ) as HTMLElement | null;
+    const statsSection = document.getElementById('stats') as HTMLElement | null;
+
+    // Stats Display
+    const pagesReadStat = document.getElementById(
+      'pagesReadStat'
+    ) as HTMLElement | null;
+    const timeReadStat = document.getElementById(
+      'timeReadStat'
+    ) as HTMLElement | null;
+    const pagesPerHourStat = document.getElementById(
+      'pagesPerHourStat'
+    ) as HTMLElement | null;
+    const minutesPerPageStat = document.getElementById(
+      'minutesPerPageStat'
+    ) as HTMLElement | null;
+
+    // Timer variables and state management
+    const TIMER_STORAGE_KEY = 'reading_session_timer';
+    const TIMER_BOOK_KEY = 'reading_session_book';
+    const TIMER_START_PAGE_KEY = 'reading_session_start_page';
+    const TIMER_SEGMENTS_KEY = 'reading_session_segments';
+
+    let isRunning = false;
+    let timerInterval = null;
+    let totalElapsedMs = 0;
+    let currentSegmentStartTime = null;
+
+    // Store segments as [startTime, endTime] pairs
+    // If a segment is active, endTime will be null
+    let timerSegments = [];
+
+    // Fetch the latest reading session for a book to suggest the starting page
+    async function fetchLatestReadingSession(bookId: string) {
+      try {
+        let bookStartingPage = 0;
+
+        // First, try to fetch the book to get its startingPage
+        try {
+          const bookResponse = await fetch(`/api/books/${bookId}`);
+          if (bookResponse.ok) {
+            const book = (await bookResponse.json()) as {
+              id: string;
+              title: string;
+              author: string;
+              pageCount: number;
+              startingPage: number;
+              finished: boolean;
+            };
+
+            // Get starting page from book (default to 0 if not set)
+            bookStartingPage = book.startingPage || 0;
+          }
+        } catch (bookError) {
+          console.error('Error fetching book details:', bookError);
+          // Continue with default starting page value (0)
+        }
+
+        // Then fetch all reading sessions for this book
+        const sessionsResponse = await fetch(
+          `/api/reading-sessions/book/${bookId}`
+        );
+        if (!sessionsResponse.ok) {
+          throw new Error('Failed to fetch reading sessions');
+        }
+
+        const sessions = (await sessionsResponse.json()) as Array<{
+          id: string;
+          date: string;
+          bookId: string;
+          pagesRead: number;
+          duration: number;
+          finished: boolean;
+        }>;
+
+        if (startPageInput && suggestedPageMsg) {
+          // Calculate total pages read across all sessions
+          const totalPagesRead = sessions.reduce(
+            (total, session) => total + session.pagesRead,
+            0
+          );
+
+          // Calculate next page to read (starting page + total pages read + 1)
+          const suggestedPage = bookStartingPage + totalPagesRead + 1;
+
+          // Set the suggested page in the input field
+          startPageInput.value = suggestedPage.toString();
+          suggestedPageMsg.classList.remove('hidden');
+
+          // Update suggestion text to be more informative
+          if (sessions.length > 0) {
+            suggestedPageMsg.textContent = `Suggested based on your previous ${sessions.length} reading session${sessions.length !== 1 ? 's' : ''}`;
+          } else if (bookStartingPage > 0) {
+            suggestedPageMsg.textContent = `Starting from page ${bookStartingPage + 1} as recorded in your library`;
+          } else {
+            suggestedPageMsg.textContent = `Starting from page 1`;
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching data for start page calculation:', error);
+        // In case of failure, don't show any suggestion
+        if (suggestedPageMsg) {
+          suggestedPageMsg.classList.add('hidden');
+        }
+      }
+    }
+
+    // When book selection changes, fetch latest reading session for that book
+    if (bookIdSelect) {
+      bookIdSelect.addEventListener('change', () => {
+        const selectedBookId = bookIdSelect.value;
+        if (selectedBookId && suggestedPageMsg) {
+          fetchLatestReadingSession(selectedBookId);
+          suggestedPageMsg.classList.add('hidden');
+        }
+      });
+
+      // Check if we have an initial bookId from the URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlBookId = urlParams.get('bookid');
+      if (urlBookId && bookIdSelect.value) {
+        fetchLatestReadingSession(bookIdSelect.value);
+      }
+    }
+
+    // Check for saved timer state
+    function loadTimerState() {
+      try {
+        const savedBookId = localStorage.getItem(TIMER_BOOK_KEY);
+        const savedStartPage = localStorage.getItem(TIMER_START_PAGE_KEY);
+        const savedSegments = localStorage.getItem(TIMER_SEGMENTS_KEY);
+
+        // First check if we have the basic required data
+        if (
+          !savedBookId ||
+          !savedStartPage ||
+          !savedSegments ||
+          !bookIdSelect
+        ) {
+          clearTimerState();
+          return;
+        }
+
+        // Check if the book ID actually exists in our current dropdown
+        const bookExists = Array.from(bookIdSelect.options).some(
+          (option) => option.value === savedBookId
+        );
+
+        if (!bookExists) {
+          console.log('Saved book ID no longer exists, clearing timer state');
+          clearTimerState();
+          return;
+        }
+
+        // Parse the segments
+        timerSegments = JSON.parse(savedSegments);
+
+        // Calculate total elapsed time from segments
+        totalElapsedMs = calculateTotalElapsedTime();
+
+        // Check if we have an active segment
+        const hasActiveSegment =
+          timerSegments.length > 0 &&
+          timerSegments[timerSegments.length - 1][1] === null;
+
+        // Set the running state based on whether we have an active segment
+        isRunning = hasActiveSegment;
+
+        // If we're running, set the current segment start time
+        if (isRunning) {
+          currentSegmentStartTime = timerSegments[timerSegments.length - 1][0];
+        } else {
+          currentSegmentStartTime = null;
+        }
+
+        // Set values in the UI
+        bookIdSelect.value = savedBookId;
+        if (startPageInput) {
+          startPageInput.value = savedStartPage;
+        }
+
+        // Update the timer display
+        updateTimerDisplay();
+
+        // Only continue setting up the timer if we actually have segments
+        if (timerSegments.length > 0) {
+          // Disable inputs during an active session
+          if (bookIdSelect) bookIdSelect.disabled = true;
+          if (startPageInput) startPageInput.disabled = true;
+
+          // Show session status
+          if (readStatus) readStatus.classList.remove('hidden');
+
+          // Update UI based on state
+          if (isRunning) {
+            if (toggleBtn) {
+              toggleBtn.classList.replace('btn-success', 'btn-warning');
+              toggleBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+                Pause
+              `;
+            }
+            startTimer();
+          } else {
+            if (toggleBtn) {
+              toggleBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                </svg>
+                Resume
+              `;
+            }
+          }
+
+          if (stopBtn) stopBtn.disabled = false;
+          if (cancelBtn) cancelBtn.disabled = false;
+        } else {
+          // No segments, means no timer has been started yet
+          clearTimerState();
+        }
+      } catch (error) {
+        console.error('Error loading timer state:', error);
+        clearTimerState();
+      }
+    }
+
+    // Calculate total elapsed time from all segments
+    function calculateTotalElapsedTime() {
+      if (!timerSegments || timerSegments.length === 0) {
+        return 0;
+      }
+
+      let total = 0;
+      const now = Date.now();
+
+      timerSegments.forEach(([start, end]) => {
+        if (start && end) {
+          // Completed segment
+          total += end - start;
+        } else if (start && end === null && isRunning) {
+          // Active segment
+          total += now - start;
+        }
+      });
+
+      return total;
+    }
+
+    // Save timer state
+    function saveTimerState() {
+      if (
+        bookIdSelect?.value &&
+        startPageInput?.value &&
+        timerSegments.length > 0
+      ) {
+        localStorage.setItem(TIMER_SEGMENTS_KEY, JSON.stringify(timerSegments));
+        localStorage.setItem(TIMER_BOOK_KEY, bookIdSelect.value);
+        localStorage.setItem(TIMER_START_PAGE_KEY, startPageInput.value);
+      }
+    }
+
+    // Clear timer state
+    function clearTimerState() {
+      localStorage.removeItem(TIMER_STORAGE_KEY);
+      localStorage.removeItem(TIMER_BOOK_KEY);
+      localStorage.removeItem(TIMER_START_PAGE_KEY);
+      localStorage.removeItem(TIMER_SEGMENTS_KEY);
+      timerSegments = [];
+      totalElapsedMs = 0;
+      isRunning = false;
+      currentSegmentStartTime = null;
+    }
+
+    // Format time as HH:MM:SS
+    function formatTime(totalSeconds) {
+      const hours = Math.floor(totalSeconds / 3600)
+        .toString()
+        .padStart(2, '0');
+      const minutes = Math.floor((totalSeconds % 3600) / 60)
+        .toString()
+        .padStart(2, '0');
+      const seconds = Math.floor(totalSeconds % 60)
+        .toString()
+        .padStart(2, '0');
+      return `${hours}:${minutes}:${seconds}`;
+    }
+
+    // Update the timer display
+    function updateTimerDisplay() {
+      if (timerDisplay) {
+        // Calculate current total time
+        const total = isRunning ? calculateTotalElapsedTime() : totalElapsedMs;
+
+        // Convert to seconds and format
+        const totalSeconds = Math.floor(total / 1000);
+        timerDisplay.textContent = formatTime(totalSeconds);
+      }
+    }
+
+    // Toggle timer between play and pause
+    function toggleTimer() {
+      if (isRunning) {
+        pauseTimer();
+      } else {
+        startTimer();
+      }
+    }
+
+    // Start the timer
+    function startTimer() {
+      if (!isRunning) {
+        // Validate if this is a fresh start
+        if (timerSegments.length === 0 && !validateStartConditions()) {
+          alert('Please select a book and enter your starting page');
+          return;
+        }
+
+        // If this is a fresh start
+        if (timerSegments.length === 0) {
+          // Disable inputs
+          if (bookIdSelect) bookIdSelect.disabled = true;
+          if (startPageInput) startPageInput.disabled = true;
+        }
+
+        // Get current time for the new segment
+        const now = Date.now();
+        currentSegmentStartTime = now;
+
+        // Add new segment with null end time (meaning it's active)
+        timerSegments.push([now, null]);
+        isRunning = true;
+
+        // Update UI
+        if (toggleBtn) {
+          toggleBtn.classList.replace('btn-success', 'btn-warning');
+          toggleBtn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+            </svg>
+            Pause
+          `;
+        }
+        if (stopBtn) stopBtn.disabled = false;
+        if (cancelBtn) cancelBtn.disabled = false;
+        if (readStatus) readStatus.classList.remove('hidden');
+
+        // Start the timer interval for display updates
+        timerInterval = window.setInterval(() => {
+          updateTimerDisplay();
+
+          // Save state periodically
+          if (Math.floor(calculateTotalElapsedTime() / 1000) % 10 === 0) {
+            saveTimerState();
+          }
+        }, 100);
+
+        // Save state immediately
+        saveTimerState();
+      }
+    }
+
+    // Pause the timer
+    function pauseTimer() {
+      if (isRunning && timerSegments.length > 0) {
+        // Stop the timer interval
+        if (timerInterval) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+        }
+
+        // Close the last segment by setting its end time
+        const now = Date.now();
+        const lastIndex = timerSegments.length - 1;
+        if (timerSegments[lastIndex][1] === null) {
+          timerSegments[lastIndex][1] = now;
+        }
+
+        // Update total elapsed time
+        totalElapsedMs = calculateTotalElapsedTime();
+
+        // Update state variables
+        currentSegmentStartTime = null;
+        isRunning = false;
+
+        // Update UI
+        updateTimerDisplay();
+        if (toggleBtn) {
+          toggleBtn.classList.replace('btn-warning', 'btn-success');
+          toggleBtn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+            </svg>
+            Resume
+          `;
+        }
+
+        // Save paused state
+        saveTimerState();
+      }
+    }
+
+    // Stop the timer
+    function stopTimer() {
+      // If timer is running, pause it first to capture final segment
+      if (isRunning) {
+        pauseTimer();
+      }
+
+      // Update UI
+      if (toggleBtn) toggleBtn.disabled = true;
+      if (stopBtn) stopBtn.disabled = true;
+
+      // Show finish section
+      if (finishSection) finishSection.classList.remove('hidden');
+    }
+
+    // Cancel the session
+    function cancelSession() {
+      if (
+        confirm(
+          'Are you sure you want to cancel this reading session? All data will be lost.'
+        )
+      ) {
+        // Stop the timer if running
+        if (timerInterval) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+        }
+
+        // Clear all timer state
+        clearTimerState();
+
+        // Reset UI
+        if (toggleBtn) {
+          toggleBtn.disabled = false;
+          toggleBtn.classList.replace('btn-warning', 'btn-success');
+          toggleBtn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+            </svg>
+            Start Reading
+          `;
+        }
+        if (stopBtn) stopBtn.disabled = true;
+        if (cancelBtn) cancelBtn.disabled = true;
+        if (readStatus) readStatus.classList.add('hidden');
+        if (finishSection) finishSection.classList.add('hidden');
+        if (bookIdSelect) bookIdSelect.disabled = false;
+        if (startPageInput) startPageInput.disabled = false;
+        if (timerDisplay) timerDisplay.textContent = '00:00:00';
+
+        // Reload the page for a fresh start
+        window.location.reload();
+      }
+    }
+
+    // Validation
+    function validateStartConditions() {
+      return bookIdSelect?.value && startPageInput?.value;
+    }
+
+    function validateEndConditions() {
+      return (
+        endPageInput?.value &&
+        parseInt(endPageInput.value) >= parseInt(startPageInput?.value || '0')
+      );
+    }
+
+    function calculateStats() {
+      if (!startPageInput?.value || !endPageInput?.value) return;
+
+      const startPage = parseInt(startPageInput.value);
+      const endPage = parseInt(endPageInput.value);
+
+      if (isNaN(startPage) || isNaN(endPage) || endPage < startPage) {
+        return;
+      }
+
+      const pagesRead = endPage - startPage + 1;
+      const durationHours = totalElapsedMs / 1000 / 3600;
+
+      if (pagesReadStat) pagesReadStat.textContent = pagesRead.toString();
+      if (timeReadStat)
+        timeReadStat.textContent = formatTime(
+          Math.floor(totalElapsedMs / 1000)
+        );
+
+      if (durationHours > 0) {
+        const pph = (pagesRead / durationHours).toFixed(1);
+        const mpp = (totalElapsedMs / 1000 / 60 / pagesRead).toFixed(1);
+
+        if (pagesPerHourStat) pagesPerHourStat.textContent = pph;
+        if (minutesPerPageStat) minutesPerPageStat.textContent = mpp;
+      }
+
+      if (statsSection) statsSection.classList.remove('hidden');
+      if (saveBtn) saveBtn.disabled = false;
+    }
+
+    // Event Listeners
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', toggleTimer);
+    }
+
+    if (stopBtn) {
+      stopBtn.addEventListener('click', stopTimer);
+    }
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', cancelSession);
+    }
+
+    if (endPageInput) {
+      endPageInput.addEventListener('input', () => {
+        if (validateEndConditions()) {
+          calculateStats();
+        } else {
+          if (statsSection) statsSection.classList.add('hidden');
+          if (saveBtn) saveBtn.disabled = true;
+        }
+      });
+    }
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        if (
+          !validateEndConditions() ||
+          !bookIdSelect?.value ||
+          !startPageInput?.value ||
+          !endPageInput?.value
+        ) {
+          alert('Please enter a valid ending page');
+          return;
+        }
+
+        const startPage = parseInt(startPageInput.value);
+        const endPage = parseInt(endPageInput.value);
+        const pagesRead = endPage - startPage + 1;
+
+        const session = {
+          date: new Date().toISOString().split('T')[0],
+          bookId: bookIdSelect.value,
+          pagesRead: pagesRead,
+          duration: Math.floor(totalElapsedMs / 1000), // Convert ms to seconds
+          finished: finishedCheckbox?.checked || false,
+        };
+
+        try {
+          const response = await fetch('/api/reading-sessions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(session),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to save reading session');
+          }
+
+          // Clear timer state after successful save
+          clearTimerState();
+
+          // Redirect to the reading sessions list page
+          window.location.href = '/reading-sessions';
+        } catch (error) {
+          console.error('Error saving reading session:', error);
+          alert('Failed to save reading session. Please try again.');
+        }
+      });
+    }
+
+    // Initial focus and state restoration
+    loadTimerState();
+
+    if (!currentSegmentStartTime) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasBookId = urlParams.has('bookid');
+
+      if (hasBookId && startPageInput) {
+        startPageInput.focus();
+      } else if (bookIdSelect) {
+        bookIdSelect.focus();
+      }
+    }
+
+    // Save state when page is unloaded
+    window.addEventListener('beforeunload', saveTimerState);
+
+    // Handle visibility change (user switching tabs or minimizing)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        if (isRunning && !timerInterval) {
+          // Page is visible again and timer should be running
+          // Don't create a new segment, just restart the interval
+          timerInterval = window.setInterval(() => {
+            updateTimerDisplay();
+
+            // Save state periodically
+            if (Math.floor(calculateTotalElapsedTime() / 1000) % 10 === 0) {
+              saveTimerState();
+            }
+          }, 100);
+        }
+      } else {
+        // Page is hidden, save the current state but keep the segment active
+        if (timerInterval) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+
+          // Don't close the segment, just save the current state
+          // This preserves the null end time in the active segment
+          saveTimerState();
+        }
+      }
+    });
+  });
+</script>
