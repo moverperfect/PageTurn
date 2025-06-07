@@ -12,8 +12,8 @@ importers:
         specifier: 0.9.4
         version: 0.9.4(typescript@5.8.3)
       '@astrojs/cloudflare':
-        specifier: 12.5.3
-        version: 12.5.3(@types/node@22.15.30)(astro@5.7.14(@types/node@22.15.30)(jiti@2.4.2)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.8.3)(yaml@2.7.1))(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.7.1)
+        specifier: 12.5.4
+        version: 12.5.4(@types/node@22.15.30)(astro@5.7.14(@types/node@22.15.30)(jiti@2.4.2)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.8.3)(yaml@2.7.1))(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.7.1)
       '@libsql/client':
         specifier: 0.15.8
         version: 0.15.8
@@ -76,8 +76,8 @@ packages:
     peerDependencies:
       typescript: ^5.0.0
 
-  '@astrojs/cloudflare@12.5.3':
-    resolution: {integrity: sha512-QYA6gkF+s3LpDNT0KoURgJeByjiSvUABK1VXBpi9yzqUQfWm3kSAtn0aBXX8EkRlE5UaJ0CkArizfgfqr9zBhA==}
+  '@astrojs/cloudflare@12.5.4':
+    resolution: {integrity: sha512-WKUeMP2tIbddEu0tlVEPj8o9m/8CJB6who3a3jupuIyR56ltmW924ZOMYtp/C9uxH7KeDJXrMszRj3LHs9U97w==}
     peerDependencies:
       astro: ^5.0.0
 
@@ -3087,7 +3087,7 @@ snapshots:
       - prettier
       - prettier-plugin-astro
 
-  '@astrojs/cloudflare@12.5.3(@types/node@22.15.30)(astro@5.7.14(@types/node@22.15.30)(jiti@2.4.2)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.8.3)(yaml@2.7.1))(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.7.1)':
+  '@astrojs/cloudflare@12.5.4(@types/node@22.15.30)(astro@5.7.14(@types/node@22.15.30)(jiti@2.4.2)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.8.3)(yaml@2.7.1))(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.7.1)':
     dependencies:
       '@astrojs/internal-helpers': 0.6.1
       '@astrojs/underscore-redirects': 0.6.1
