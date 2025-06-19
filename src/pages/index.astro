@@ -137,6 +137,26 @@ const booksWithStats = currentlyReadingBooks.map((book) => {
                     Log Session
                   </a>
                 </div>
+                <div class="mt-2">
+                  <a
+                    href={`/reading-sessions/live?bookid=${book.id}`}
+                    class="btn-success block text-center flex items-center justify-center"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-5 w-5 mr-2"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                        clip-rule="evenodd"
+                      />
+                    </svg>
+                    Live Read
+                  </a>
+                </div>
               </div>
             ))}
           </div>
@@ -152,6 +172,20 @@ const booksWithStats = currentlyReadingBooks.map((book) => {
       <div class="flex flex-wrap gap-4">
         <a href="/books/new" class="btn">Add New Book</a>
         <a href="/reading-sessions/new" class="btn">Log Reading Session</a>
+        <a href="/reading-sessions/live" class="btn-success">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5 mr-2 inline-block"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+              clip-rule="evenodd"></path>
+          </svg>
+          Live Reading Session
+        </a>
       </div>
     </section>
   </div>

@@ -66,7 +66,12 @@ sessionsWithBookInfo.sort((a, b) => {
   <div>
     <div class="flex justify-between items-center mb-6">
       <h1 class="mb-0">Reading Sessions</h1>
-      <a href="/reading-sessions/new" class="btn">Log New Session</a>
+      <div class="flex space-x-3">
+        <a href="/reading-sessions/live" class="btn-secondary">
+          Start Live Session
+        </a>
+        <a href="/reading-sessions/new" class="btn">Log New Session</a>
+      </div>
     </div>
 
     {
@@ -76,9 +81,14 @@ sessionsWithBookInfo.sort((a, b) => {
           <p class="mb-6">
             Start tracking your reading by logging your first session.
           </p>
-          <a href="/reading-sessions/new" class="btn">
-            Log Your First Session
-          </a>
+          <div class="flex flex-col sm:flex-row justify-center gap-4">
+            <a href="/reading-sessions/live" class="btn-secondary">
+              Start Live Session
+            </a>
+            <a href="/reading-sessions/new" class="btn">
+              Log Your First Session
+            </a>
+          </div>
         </div>
       ) : (
         <div>
