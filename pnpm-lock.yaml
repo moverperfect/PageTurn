@@ -13,7 +13,7 @@ importers:
         version: 0.9.4(typescript@5.9.2)
       '@astrojs/cloudflare':
         specifier: 12.6.3
-        version: 12.6.3(@types/node@22.16.5)(astro@5.12.8(@types/node@22.16.5)(jiti@2.4.2)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.9.2)(yaml@2.7.1))(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.7.1)
+        version: 12.6.3(@types/node@22.16.5)(astro@5.12.9(@types/node@22.16.5)(jiti@2.4.2)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.9.2)(yaml@2.7.1))(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.7.1)
       '@libsql/client':
         specifier: 0.15.10
         version: 0.15.10
@@ -24,8 +24,8 @@ importers:
         specifier: 10.0.0
         version: 10.0.0
       astro:
-        specifier: 5.12.8
-        version: 5.12.8(@types/node@22.16.5)(jiti@2.4.2)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.9.2)(yaml@2.7.1)
+        specifier: 5.12.9
+        version: 5.12.9(@types/node@22.16.5)(jiti@2.4.2)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.9.2)(yaml@2.7.1)
       better-auth:
         specifier: 1.3.4
         version: 1.3.4
@@ -1159,8 +1159,8 @@ packages:
     resolution: {integrity: sha512-UOCGPYbl0tv8+006qks/dTgV9ajs97X2p0FAbyS2iyCRrmLSRolDaHdp+v/CLgnzHc3fVB+CwYiUmei7ndFcgA==}
     engines: {node: '>=12.0.0'}
 
-  astro@5.12.8:
-    resolution: {integrity: sha512-KkJ7FR+c2SyZYlpakm48XBiuQcRsrVtdjG5LN5an0givI/tLik+ePJ4/g3qrAVhYMjJOxBA2YgFQxANPiWB+Mw==}
+  astro@5.12.9:
+    resolution: {integrity: sha512-cZ7kZ61jyE5nwSrFKSRyf5Gds+uJELqQxJFqMkcgiWQvhWZJUSShn8Uz3yc9WLyLw5Kim5P5un9SkJSGogfEZQ==}
     engines: {node: 18.20.8 || ^20.3.0 || >=22.0.0, npm: '>=9.6.5', pnpm: '>=7.1.0'}
     hasBin: true
 
@@ -2942,12 +2942,12 @@ snapshots:
       - prettier
       - prettier-plugin-astro
 
-  '@astrojs/cloudflare@12.6.3(@types/node@22.16.5)(astro@5.12.8(@types/node@22.16.5)(jiti@2.4.2)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.9.2)(yaml@2.7.1))(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.7.1)':
+  '@astrojs/cloudflare@12.6.3(@types/node@22.16.5)(astro@5.12.9(@types/node@22.16.5)(jiti@2.4.2)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.9.2)(yaml@2.7.1))(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.7.1)':
     dependencies:
       '@astrojs/internal-helpers': 0.7.1
       '@astrojs/underscore-redirects': 1.0.0
       '@cloudflare/workers-types': 4.20250513.0
-      astro: 5.12.8(@types/node@22.16.5)(jiti@2.4.2)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.9.2)(yaml@2.7.1)
+      astro: 5.12.9(@types/node@22.16.5)(jiti@2.4.2)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.9.2)(yaml@2.7.1)
       tinyglobby: 0.2.13
       vite: 6.3.5(@types/node@22.16.5)(jiti@2.4.2)(lightningcss@1.30.1)(yaml@2.7.1)
       wrangler: 4.27.0(@cloudflare/workers-types@4.20250513.0)
@@ -3893,7 +3893,7 @@ snapshots:
       pvutils: 1.1.3
       tslib: 2.8.1
 
-  astro@5.12.8(@types/node@22.16.5)(jiti@2.4.2)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.9.2)(yaml@2.7.1):
+  astro@5.12.9(@types/node@22.16.5)(jiti@2.4.2)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.9.2)(yaml@2.7.1):
     dependencies:
       '@astrojs/compiler': 2.12.2
       '@astrojs/internal-helpers': 0.7.1
