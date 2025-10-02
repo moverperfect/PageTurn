@@ -30,8 +30,8 @@ importers:
         specifier: 1.3.24
         version: 1.3.24
       drizzle-orm:
-        specifier: 0.44.5
-        version: 0.44.5(@cloudflare/workers-types@4.20250922.0)(@libsql/client@0.15.15)(@prisma/client@6.6.0(prisma@6.6.0(typescript@5.9.3))(typescript@5.9.3))(@types/better-sqlite3@7.6.13)(better-sqlite3@12.2.0)(kysely@0.28.5)(prisma@6.6.0(typescript@5.9.3))
+        specifier: 0.44.6
+        version: 0.44.6(@cloudflare/workers-types@4.20250922.0)(@libsql/client@0.15.15)(@prisma/client@6.6.0(prisma@6.6.0(typescript@5.9.3))(typescript@5.9.3))(@types/better-sqlite3@7.6.13)(better-sqlite3@12.2.0)(kysely@0.28.5)(prisma@6.6.0(typescript@5.9.3))
       uuid:
         specifier: 11.1.0
         version: 11.1.0
@@ -1465,8 +1465,8 @@ packages:
     resolution: {integrity: sha512-+CHgPFzuoTQTt7cOYCV6MOw2w8vqEn/ap1yv4bpZOWL03u7rlVRQhUY0WYT3rHsgVTXwYQDZaSUJSQrMBUKuWg==}
     hasBin: true
 
-  drizzle-orm@0.44.5:
-    resolution: {integrity: sha512-jBe37K7d8ZSKptdKfakQFdeljtu3P2Cbo7tJoJSVZADzIKOBo9IAJPOmMsH2bZl90bZgh8FQlD8BjxXA/zuBkQ==}
+  drizzle-orm@0.44.6:
+    resolution: {integrity: sha512-uy6uarrrEOc9K1u5/uhBFJbdF5VJ5xQ/Yzbecw3eAYOunv5FDeYkR2m8iitocdHBOHbvorviKOW5GVw0U1j4LQ==}
     peerDependencies:
       '@aws-sdk/client-rds-data': '>=3'
       '@cloudflare/workers-types': '>=4'
@@ -4386,7 +4386,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.44.5(@cloudflare/workers-types@4.20250922.0)(@libsql/client@0.15.15)(@prisma/client@6.6.0(prisma@6.6.0(typescript@5.9.3))(typescript@5.9.3))(@types/better-sqlite3@7.6.13)(better-sqlite3@12.2.0)(kysely@0.28.5)(prisma@6.6.0(typescript@5.9.3)):
+  drizzle-orm@0.44.6(@cloudflare/workers-types@4.20250922.0)(@libsql/client@0.15.15)(@prisma/client@6.6.0(prisma@6.6.0(typescript@5.9.3))(typescript@5.9.3))(@types/better-sqlite3@7.6.13)(better-sqlite3@12.2.0)(kysely@0.28.5)(prisma@6.6.0(typescript@5.9.3)):
     optionalDependencies:
       '@cloudflare/workers-types': 4.20250922.0
       '@libsql/client': 0.15.15
