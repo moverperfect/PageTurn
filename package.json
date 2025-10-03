@@ -39,6 +39,6 @@
     "tailwindcss": "4.1.14",
     "ts-node": "10.9.2",
     "typescript": "5.9.3",
-    "wrangler": "4.28.1"
+    "wrangler": "4.42.0"
   }
 }
