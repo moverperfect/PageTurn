@@ -27,8 +27,8 @@ importers:
         specifier: 5.12.9
         version: 5.12.9(@types/node@22.16.5)(jiti@2.6.1)(lightningcss@1.30.1)(rollup@4.40.0)(typescript@5.9.3)(yaml@2.7.1)
       better-auth:
-        specifier: 1.3.24
-        version: 1.3.24
+        specifier: 1.3.25
+        version: 1.3.25
       drizzle-orm:
         specifier: 0.44.6
         version: 0.44.6(@cloudflare/workers-types@4.20250922.0)(@libsql/client@0.15.15)(@prisma/client@6.6.0(prisma@6.6.0(typescript@5.9.3))(typescript@5.9.3))(@types/better-sqlite3@7.6.13)(better-sqlite3@12.2.0)(kysely@0.28.5)(prisma@6.6.0(typescript@5.9.3))
@@ -135,8 +135,8 @@ packages:
     resolution: {integrity: sha512-H45s8fVLYjbhFH62dIJ3WtmJ6RSPt/3DRO0ZcT2SUiYiQyz3BLVb9ADEnLl91m74aQPS3AzzeajZHYOalWe3bg==}
     engines: {node: '>=6.9.0'}
 
-  '@better-auth/core@1.3.24':
-    resolution: {integrity: sha512-nU4aj5SA0COXAls0p3htIWmGPOG+76HULd9tG8CEUfwcK95rRrUIUN74FKvsAu3b18AVj3E7cL4bYrQS3KYKRw==}
+  '@better-auth/core@1.3.25':
+    resolution: {integrity: sha512-+Z09RkrpufX8+skD05pAoMSNo95Cl6nwfqrcEHfXJPaiSGJNXoo4/0GNtxZAgsW89xfRdsmbVAwwEd1AlCrHZA==}
 
   '@better-auth/utils@0.3.0':
     resolution: {integrity: sha512-W+Adw6ZA6mgvnSnhOki270rwJ42t4XzSK6YWGF//BbVXL6SwCLWfyzBc1lN2m/4RM28KubdBKQ4X5VMoLRNPQw==}
@@ -1225,8 +1225,8 @@ packages:
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
-  better-auth@1.3.24:
-    resolution: {integrity: sha512-LyxIbnB2FExhjqQ/J1G8S8EAbmTBDFOz6CjqHNNu15Gux+c4fF0Si1YNLprROEb4EGNuGUfslurW0Q6nZ+Dobg==}
+  better-auth@1.3.25:
+    resolution: {integrity: sha512-prTPitTvhIbYPeO/M1QrkveT5afbkyV1OAfnSxYe3WfgTdKgRiEO3tMIPzwmKA54zSWw6XBYKtSD9uIuAAfvuQ==}
     peerDependencies:
       '@lynx-js/react': '*'
       '@sveltejs/kit': '*'
@@ -3201,7 +3201,7 @@ snapshots:
       '@babel/helper-string-parser': 7.25.9
       '@babel/helper-validator-identifier': 7.25.9
 
-  '@better-auth/core@1.3.24':
+  '@better-auth/core@1.3.25':
     dependencies:
       better-call: 1.0.19
       zod: 4.1.5
@@ -4177,9 +4177,9 @@ snapshots:
 
   base64-js@1.5.1: {}
 
-  better-auth@1.3.24:
+  better-auth@1.3.25:
     dependencies:
-      '@better-auth/core': 1.3.24
+      '@better-auth/core': 1.3.25
       '@better-auth/utils': 0.3.0
       '@better-fetch/fetch': 1.1.18
       '@noble/ciphers': 2.0.0
