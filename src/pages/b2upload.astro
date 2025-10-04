@@ -164,19 +164,39 @@ const isAuthorized = user.role === 'admin';
 
         <!-- Content -->
         <div class="p-6 overflow-y-auto flex-1">
-          <div class="mb-4">
-            <label
-              for="folder-select"
-              class="block text-sm font-medium text-gray-300 mb-2"
-            >
-              Select Date Folder
-            </label>
-            <select
-              id="folder-select"
-              class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-gray-200"
-            >
-              <option value="">Loading folders...</option>
-            </select>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <!-- Username Selection -->
+            <div>
+              <label
+                for="username-select"
+                class="block text-sm font-medium text-gray-300 mb-2"
+              >
+                Select User
+              </label>
+              <select
+                id="username-select"
+                class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-gray-200"
+              >
+                <option value="">Loading users...</option>
+              </select>
+            </div>
+
+            <!-- Date Selection -->
+            <div>
+              <label
+                for="date-select"
+                class="block text-sm font-medium text-gray-300 mb-2"
+              >
+                Select Date
+              </label>
+              <select
+                id="date-select"
+                class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-gray-200"
+                disabled
+              >
+                <option value="">Select a user first</option>
+              </select>
+            </div>
           </div>
 
           <div id="files-loading" class="text-center py-8 text-gray-400">
@@ -230,9 +250,7 @@ const isAuthorized = user.role === 'admin';
         </div>
 
         <!-- Image container with navigation -->
-        <div
-          class="flex-1 flex items-center justify-center relative overflow-hidden"
-        >
+        <div class="flex-1 flex items-center justify-center relative min-h-0">
           <!-- Previous button -->
           <button
             id="viewer-prev-btn"
@@ -255,7 +273,7 @@ const isAuthorized = user.role === 'admin';
 
           <!-- Image -->
           <div
-            class="p-2 sm:p-4 md:p-6 max-w-full max-h-full flex items-center justify-center"
+            class="w-full h-full p-2 sm:p-4 md:p-6 flex items-center justify-center"
           >
             <img
               id="viewer-image"
@@ -302,7 +320,21 @@ const isAuthorized = user.role === 'admin';
     </div>
   </div>
 
+  <script define:vars={{ userName: user.name }}>
+    window.currentUser = {
+      name: userName,
+    };
+  </script>
   <script>
+    // Type declarations
+    declare global {
+      interface Window {
+        currentUser?: {
+          name: string;
+        };
+      }
+    }
+
     type FileStatus = 'pending' | 'hashing' | 'uploading' | 'success' | 'error';
 
     interface FileUpload {
@@ -654,12 +686,24 @@ const isAuthorized = user.role === 'admin';
       }
     }
 
-    function getTodayFolder(): string {
+    /**
+     * Encode a file path by encoding each segment separately while preserving forward slashes.
+     * This ensures folder structure is maintained in B2 storage.
+     */
+    function encodeFilePath(path: string): string {
+      return path
+        .split('/')
+        .map((segment) => encodeURIComponent(segment))
+        .join('/');
+    }
+
+    function getTodayFolder(username: string): string {
       const now = new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const day = String(now.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+      // Organize by username, then by date
+      return `${encodeURIComponent(username)}/${year}-${month}-${day}`;
     }
 
     async function uploadFile(upload: FileUpload) {
@@ -668,7 +712,8 @@ const isAuthorized = user.role === 'admin';
       // Step 1: Get upload URL with date-based path
       updateFileStatus(id, 'hashing', 10);
 
-      const todayFolder = getTodayFolder();
+      const username = window.currentUser?.name || 'unknown';
+      const todayFolder = getTodayFolder(username);
       const fileNameWithPath = `${todayFolder}/${file.name}`;
 
       const response = await fetch('/api/b2/get-upload-url', {
@@ -722,7 +767,7 @@ const isAuthorized = user.role === 'admin';
         method: 'POST',
         headers: {
           Authorization: authorizationToken,
-          'X-Bz-File-Name': encodeURIComponent(fileNameWithPath),
+          'X-Bz-File-Name': encodeFilePath(fileNameWithPath),
           'Content-Type': file.type || 'application/octet-stream',
           'X-Bz-Content-Sha1': sha1,
         },
@@ -754,12 +799,18 @@ const isAuthorized = user.role === 'admin';
     const viewFilesBtn = document.getElementById('view-files-btn');
     const fileBrowserModal = document.getElementById('file-browser-modal');
     const closeBrowserBtn = document.getElementById('close-browser-btn');
-    const folderSelect = document.getElementById(
-      'folder-select'
+    const usernameSelect = document.getElementById(
+      'username-select'
+    ) as HTMLSelectElement;
+    const dateSelect = document.getElementById(
+      'date-select'
     ) as HTMLSelectElement;
     const filesLoading = document.getElementById('files-loading');
     const filesGrid = document.getElementById('files-grid');
     const noFiles = document.getElementById('no-files');
+
+    // Store all folders for filtering
+    let allFolders: string[] = [];
 
     // Image Viewer functionality
     const imageViewerModal = document.getElementById('image-viewer-modal');
@@ -830,10 +881,32 @@ const isAuthorized = user.role === 'admin';
       }
     });
 
-    if (folderSelect) {
-      folderSelect.addEventListener('change', async () => {
-        if (folderSelect.value) {
-          await loadFilesInFolder(folderSelect.value);
+    if (usernameSelect) {
+      usernameSelect.addEventListener('change', () => {
+        const selectedUsername = usernameSelect.value;
+        if (selectedUsername) {
+          loadDatesForUser(selectedUsername);
+        } else {
+          // Reset date dropdown
+          if (dateSelect) {
+            dateSelect.disabled = true;
+            dateSelect.innerHTML =
+              '<option value="">Select a user first</option>';
+          }
+          // Clear files display
+          if (filesGrid) filesGrid.classList.add('hidden');
+          if (noFiles) noFiles.classList.add('hidden');
+        }
+      });
+    }
+
+    if (dateSelect) {
+      dateSelect.addEventListener('change', async () => {
+        const selectedUsername = usernameSelect.value;
+        const selectedDate = dateSelect.value;
+        if (selectedUsername && selectedDate) {
+          const folderPath = `${selectedUsername}/${selectedDate}`;
+          await loadFilesInFolder(folderPath);
         }
       });
     }
@@ -846,32 +919,100 @@ const isAuthorized = user.role === 'admin';
         }
 
         const data = (await response.json()) as { folders: string[] };
+        allFolders = data.folders;
 
-        if (folderSelect) {
-          folderSelect.innerHTML =
-            data.folders.length > 0
-              ? data.folders
-                  .map(
-                    (folder) => `<option value="${folder}">${folder}</option>`
-                  )
-                  .join('')
-              : '<option value="">No folders found</option>';
+        // Extract unique usernames from folder paths (username/date format)
+        // Usernames in folders are URL-encoded, so we need to decode them for display
+        const encodedUsernames = new Set<string>();
+        allFolders.forEach((folder) => {
+          const parts = folder.split('/');
+          if (parts.length >= 1) {
+            encodedUsernames.add(parts[0]); // Store encoded version
+          }
+        });
 
-          // Auto-load today's folder if it exists
-          const todayFolder = getTodayFolder();
-          if (data.folders.includes(todayFolder)) {
-            folderSelect.value = todayFolder;
-            await loadFilesInFolder(todayFolder);
-          } else if (data.folders.length > 0) {
-            folderSelect.value = data.folders[0];
-            await loadFilesInFolder(data.folders[0]);
+        const sortedEncodedUsernames = Array.from(encodedUsernames).sort(
+          (a, b) => {
+            // Sort by decoded names for better alphabetical ordering
+            return decodeURIComponent(a).localeCompare(decodeURIComponent(b));
+          }
+        );
+
+        if (usernameSelect) {
+          if (sortedEncodedUsernames.length > 0) {
+            usernameSelect.innerHTML =
+              '<option value="">Select a user...</option>' +
+              sortedEncodedUsernames
+                .map((encodedUsername) => {
+                  const displayName = decodeURIComponent(encodedUsername);
+                  return `<option value="${encodedUsername}">${displayName}</option>`;
+                })
+                .join('');
+
+            // Auto-select current user if available
+            const currentUsername = window.currentUser?.name;
+            if (currentUsername) {
+              const encodedCurrentUser = encodeURIComponent(currentUsername);
+              if (sortedEncodedUsernames.includes(encodedCurrentUser)) {
+                usernameSelect.value = encodedCurrentUser;
+                loadDatesForUser(encodedCurrentUser);
+              }
+            }
+          } else {
+            usernameSelect.innerHTML =
+              '<option value="">No users found</option>';
           }
         }
       } catch (error) {
         console.error('Error loading folders:', error);
-        if (folderSelect) {
-          folderSelect.innerHTML =
-            '<option value="">Error loading folders</option>';
+        if (usernameSelect) {
+          usernameSelect.innerHTML =
+            '<option value="">Error loading users</option>';
+        }
+      }
+    }
+
+    function loadDatesForUser(encodedUsername: string) {
+      // Filter folders for the selected username (already encoded)
+      const userFolders = allFolders.filter((folder) =>
+        folder.startsWith(`${encodedUsername}/`)
+      );
+
+      // Extract dates from the folder paths
+      const dates = userFolders
+        .map((folder) => {
+          const parts = folder.split('/');
+          return parts.length >= 2 ? parts[1] : null;
+        })
+        .filter((date) => date !== null) as string[];
+
+      // Sort dates (newest first)
+      const sortedDates = dates.sort((a, b) => b.localeCompare(a));
+
+      if (dateSelect) {
+        dateSelect.disabled = false;
+
+        if (sortedDates.length > 0) {
+          dateSelect.innerHTML =
+            '<option value="">Select a date...</option>' +
+            sortedDates
+              .map((date) => `<option value="${date}">${date}</option>`)
+              .join('');
+
+          // Auto-select today's date if it exists
+          const rawUsername = window.currentUser?.name || 'unknown';
+          const todayFolder = getTodayFolder(rawUsername);
+          const todayDate = todayFolder.split('/')[1]; // Get just the date part
+
+          if (sortedDates.includes(todayDate)) {
+            dateSelect.value = todayDate;
+            // Use the encoded username for the folder path
+            const folderPath = `${encodedUsername}/${todayDate}`;
+            loadFilesInFolder(folderPath);
+          }
+        } else {
+          dateSelect.innerHTML =
+            '<option value="">No dates found for this user</option>';
         }
       }
     }

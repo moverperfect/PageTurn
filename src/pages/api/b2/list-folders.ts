@@ -44,6 +44,8 @@ export const GET: APIRoute = async ({ locals }) => {
     const authData = await authResponse.json();
 
     // List all files to extract folder names
+    // NOTE: We don't use delimiter here because we need to see the full file paths
+    // to extract the complete folder structure (username/date)
     const listResponse = await fetch(
       `${authData.apiUrl}/b2api/v2/b2_list_file_names`,
       {
@@ -55,7 +57,6 @@ export const GET: APIRoute = async ({ locals }) => {
         body: JSON.stringify({
           bucketId: env.B2_BUCKET_ID,
           maxFileCount: 10000,
-          delimiter: '/',
         }),
       }
     );
@@ -66,20 +67,25 @@ export const GET: APIRoute = async ({ locals }) => {
 
     const listData = await listResponse.json();
 
-    // Extract unique folder names (prefixes)
+    // Extract unique folder paths (username/date format)
     const folders = new Set<string>();
 
     // Check for files with paths
     if (listData.files) {
       for (const file of listData.files) {
         const parts = file.fileName.split('/');
-        if (parts.length > 1) {
-          folders.add(parts[0]); // Add the folder part
+        // For nested structure like username/YYYY-MM-DD/file.jpg, we want username/YYYY-MM-DD
+        if (parts.length >= 3) {
+          // This assumes structure: username/date/filename
+          folders.add(`${parts[0]}/${parts[1]}`);
+        } else if (parts.length === 2) {
+          // Backward compatibility: old structure was just date/filename
+          folders.add(parts[0]);
         }
       }
     }
 
-    // Sort folders by date (newest first)
+    // Sort folders by path (newest first) - this will sort by username, then date
     const sortedFolders = Array.from(folders).sort((a, b) => b.localeCompare(a));
 
     return new Response(

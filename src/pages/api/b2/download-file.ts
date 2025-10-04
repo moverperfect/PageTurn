@@ -78,11 +78,11 @@ export const GET: APIRoute = async ({ locals, url }) => {
     // Stream the file back to the client
     const headers: Record<string, string> = {
       'Content-Type': contentType,
-      // Aggressive caching since photos don't change (immutable)
-      // Cache for 1 year, CDN can cache, browser can cache
-      'Cache-Control': 'public, max-age=31536000, immutable',
-      // Allow Cloudflare to cache at the edge
-      'CDN-Cache-Control': 'public, max-age=31536000',
+      // Private caching only - no shared/CDN caching for admin-protected files
+      // Allows browser caching but requires re-authentication on each session
+      'Cache-Control': 'private, max-age=3600, must-revalidate',
+      // Prevent CDN from caching admin-protected content
+      'CDN-Cache-Control': 'no-store',
     };
 
     if (contentLength) {
