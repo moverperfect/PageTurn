@@ -1,0 +1,1045 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const session = Astro.locals.session;
+const user = session?.User;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+// Only admins can access B2 upload
+const isAuthorized = user.role === 'admin';
+---
+
+<Layout title="B2 Upload | PageTurn">
+  <div class="max-w-4xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-3xl font-bold">Backblaze B2 File Upload</h1>
+      <button id="view-files-btn" class="btn-secondary">
+        View Uploaded Files
+      </button>
+    </div>
+
+    {
+      !isAuthorized ? (
+        <div class="card bg-red-900/20 border-red-800">
+          <div class="flex items-start gap-3">
+            <svg
+              class="w-6 h-6 text-red-400 shrink-0 mt-0.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <div>
+              <h3 class="text-lg font-semibold text-red-300 mb-1">
+                Access Denied
+              </h3>
+              <p class="text-gray-300">
+                You do not have permission to access this page.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div class="card mb-6">
+            <div class="mb-4">
+              <p class="text-gray-300">
+                Upload files directly to Backblaze B2 storage. Files are
+                uploaded securely from your browser.
+              </p>
+            </div>
+
+            <div class="mb-4">
+              <label
+                for="file-input"
+                class="block text-sm font-medium text-gray-300 mb-2"
+              >
+                Select Files
+              </label>
+              <input
+                type="file"
+                id="file-input"
+                multiple
+                accept="image/*"
+                class="block w-full text-sm text-gray-400
+                 file:mr-4 file:py-2 file:px-4
+                 file:rounded-md file:border-0
+                 file:text-sm file:font-semibold
+                 file:bg-indigo-600 file:text-white
+                 hover:file:bg-indigo-700
+                 file:cursor-pointer cursor-pointer"
+              />
+              <p class="text-sm text-gray-400 mt-2">
+                Select multiple images to upload
+              </p>
+            </div>
+
+            <div class="flex gap-3">
+              <button
+                id="upload-btn"
+                class="btn-primary flex-1 sm:flex-none"
+                disabled
+              >
+                Upload Files
+              </button>
+              <button
+                id="retry-btn"
+                class="btn bg-yellow-600 hover:bg-yellow-700 flex-1 sm:flex-none"
+                style="display: none;"
+              >
+                Retry Failed
+              </button>
+              <button
+                id="clear-btn"
+                class="btn bg-slate-700 hover:bg-slate-600 flex-1 sm:flex-none"
+                style="display: none;"
+              >
+                Clear Selection
+              </button>
+            </div>
+          </div>
+
+          <div id="selected-files" class="hidden">
+            <h2 class="text-xl font-semibold mb-4">
+              <span id="selected-count">0</span> Files Selected
+            </h2>
+            <div class="card">
+              <div id="files-queue" class="space-y-3" />
+            </div>
+          </div>
+
+          <div id="upload-summary" class="hidden mt-6">
+            <div class="card bg-green-900/20 border-green-800">
+              <div class="flex items-start gap-3">
+                <svg
+                  class="w-6 h-6 text-green-400 shrink-0 mt-0.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <div>
+                  <h3 class="text-lg font-semibold text-green-300 mb-1">
+                    Upload Complete
+                  </h3>
+                  <p class="text-gray-300" id="summary-text" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    <!-- File Browser Modal -->
+    <div
+      id="file-browser-modal"
+      class="hidden fixed inset-0 bg-black bg-opacity-75 z-[100] flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-slate-900 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col border border-slate-700"
+      >
+        <!-- Header -->
+        <div
+          class="flex items-center justify-between p-6 border-b border-slate-700 shrink-0"
+        >
+          <h2 class="text-2xl font-bold">Uploaded Files</h2>
+          <button id="close-browser-btn" class="btn-secondary"> Close </button>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6 overflow-y-auto flex-1">
+          <div class="mb-4">
+            <label
+              for="folder-select"
+              class="block text-sm font-medium text-gray-300 mb-2"
+            >
+              Select Date Folder
+            </label>
+            <select
+              id="folder-select"
+              class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-gray-200"
+            >
+              <option value="">Loading folders...</option>
+            </select>
+          </div>
+
+          <div id="files-loading" class="text-center py-8 text-gray-400">
+            Loading...
+          </div>
+
+          <div
+            id="files-grid"
+            class="hidden grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
+          >
+            <!-- Files will be inserted here -->
+          </div>
+
+          <div id="no-files" class="hidden text-center py-8 text-gray-400">
+            No files found in this folder
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Viewer Modal -->
+    <div id="image-viewer-modal" class="hidden fixed inset-0 bg-black z-[100]">
+      <div class="h-full w-full flex flex-col">
+        <!-- Header with filename and close button -->
+        <div
+          class="flex items-center justify-between p-4 bg-black bg-opacity-80 backdrop-blur-sm shrink-0"
+        >
+          <h3
+            id="viewer-filename"
+            class="text-sm sm:text-base md:text-lg font-semibold text-white truncate flex-1 mr-4"
+          >
+          </h3>
+          <button
+            id="close-viewer-btn"
+            class="text-white hover:text-gray-300 shrink-0 p-2 hover:bg-white hover:bg-opacity-10 rounded-lg transition-colors"
+            aria-label="Close viewer"
+          >
+            <svg
+              class="w-6 h-6 sm:w-8 sm:h-8"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Image container with navigation -->
+        <div
+          class="flex-1 flex items-center justify-center relative overflow-hidden"
+        >
+          <!-- Previous button -->
+          <button
+            id="viewer-prev-btn"
+            class="absolute left-2 sm:left-4 z-10 p-2 sm:p-3 bg-black bg-opacity-50 hover:bg-opacity-75 rounded-full text-white transition-all"
+            aria-label="Previous image"
+          >
+            <svg
+              class="w-6 h-6 sm:w-8 sm:h-8"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15 19l-7-7 7-7"></path>
+            </svg>
+          </button>
+
+          <!-- Image -->
+          <div
+            class="p-2 sm:p-4 md:p-6 max-w-full max-h-full flex items-center justify-center"
+          >
+            <img
+              id="viewer-image"
+              src=""
+              alt=""
+              class="max-w-full max-h-full w-auto h-auto object-contain"
+              style="image-rendering: auto;"
+            />
+          </div>
+
+          <!-- Next button -->
+          <button
+            id="viewer-next-btn"
+            class="absolute right-2 sm:right-4 z-10 p-2 sm:p-3 bg-black bg-opacity-50 hover:bg-opacity-75 rounded-full text-white transition-all"
+            aria-label="Next image"
+          >
+            <svg
+              class="w-6 h-6 sm:w-8 sm:h-8"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 5l7 7-7 7"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Thumbnail carousel at bottom -->
+        <div
+          class="bg-black bg-opacity-80 backdrop-blur-sm p-2 sm:p-4 shrink-0"
+        >
+          <div
+            class="flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800"
+            id="viewer-carousel"
+          >
+            <!-- Thumbnails will be inserted here -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    type FileStatus = 'pending' | 'hashing' | 'uploading' | 'success' | 'error';
+
+    interface FileUpload {
+      file: File;
+      id: string;
+      status: FileStatus;
+      progress: number;
+      error?: string;
+    }
+
+    // Polyfill for crypto.randomUUID() for older browsers
+    function generateUUID(): string {
+      if (
+        typeof crypto !== 'undefined' &&
+        typeof crypto.randomUUID === 'function'
+      ) {
+        return crypto.randomUUID();
+      }
+
+      // Fallback UUID v4 generator
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
+        /[xy]/g,
+        function (c) {
+          const r = (Math.random() * 16) | 0;
+          const v = c === 'x' ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        }
+      );
+    }
+
+    // Move modals to body to escape Layout's stacking context
+    document.addEventListener('DOMContentLoaded', () => {
+      const fileBrowserModal = document.getElementById('file-browser-modal');
+      const imageViewerModal = document.getElementById('image-viewer-modal');
+
+      if (fileBrowserModal) {
+        document.body.appendChild(fileBrowserModal);
+      }
+
+      if (imageViewerModal) {
+        document.body.appendChild(imageViewerModal);
+      }
+    });
+
+    const fileInput = document.getElementById('file-input') as HTMLInputElement;
+    const uploadBtn = document.getElementById(
+      'upload-btn'
+    ) as HTMLButtonElement;
+    const retryBtn = document.getElementById('retry-btn') as HTMLButtonElement;
+    const clearBtn = document.getElementById('clear-btn') as HTMLButtonElement;
+    const selectedFilesDiv = document.getElementById(
+      'selected-files'
+    ) as HTMLDivElement;
+    const selectedCountSpan = document.getElementById(
+      'selected-count'
+    ) as HTMLSpanElement;
+    const filesQueue = document.getElementById('files-queue') as HTMLDivElement;
+    const uploadSummary = document.getElementById(
+      'upload-summary'
+    ) as HTMLDivElement;
+    const summaryText = document.getElementById(
+      'summary-text'
+    ) as HTMLParagraphElement;
+
+    let fileUploads: FileUpload[] = [];
+    let isUploading = false;
+
+    if (fileInput && uploadBtn && retryBtn && clearBtn) {
+      // Handle file selection with better mobile support
+      const handleFileSelection = () => {
+        console.log('File selection triggered');
+        console.log('Files selected:', fileInput.files?.length || 0);
+
+        if (fileInput.files && fileInput.files.length > 0) {
+          try {
+            loadFiles();
+            uploadBtn.disabled = false;
+            clearBtn.style.display = 'block';
+            retryBtn.style.display = 'none';
+          } catch (error) {
+            console.error('Error loading files:', error);
+            alert('Error loading files. Please try again.');
+          }
+        } else {
+          uploadBtn.disabled = true;
+          clearBtn.style.display = 'none';
+          retryBtn.style.display = 'none';
+          selectedFilesDiv.classList.add('hidden');
+        }
+      };
+
+      // Listen to both change and input events for better mobile compatibility
+      fileInput.addEventListener('change', handleFileSelection);
+      fileInput.addEventListener('input', handleFileSelection);
+
+      clearBtn.addEventListener('click', () => {
+        fileInput.value = '';
+        fileUploads = [];
+        uploadBtn.disabled = true;
+        clearBtn.style.display = 'none';
+        retryBtn.style.display = 'none';
+        selectedFilesDiv.classList.add('hidden');
+        uploadSummary.classList.add('hidden');
+      });
+
+      uploadBtn.addEventListener('click', async () => {
+        console.log('Upload button clicked');
+        console.log('Files in queue:', fileUploads.length);
+
+        if (isUploading) {
+          console.log('Already uploading, ignoring click');
+          return;
+        }
+
+        if (fileUploads.length === 0) {
+          console.error('No files to upload');
+          alert('Please select files first');
+          return;
+        }
+
+        isUploading = true;
+        uploadBtn.disabled = true;
+        clearBtn.disabled = true;
+        retryBtn.style.display = 'none';
+        uploadBtn.textContent = 'Uploading...';
+        uploadSummary.classList.add('hidden');
+
+        try {
+          await uploadAllFiles();
+        } catch (error) {
+          console.error('Error during upload:', error);
+          alert('An error occurred during upload. Check console for details.');
+        }
+
+        uploadBtn.textContent = 'Upload Files';
+        clearBtn.disabled = false;
+        isUploading = false;
+
+        // Show summary and retry button if there are failures
+        const successful = fileUploads.filter(
+          (f) => f.status === 'success'
+        ).length;
+        const failed = fileUploads.filter((f) => f.status === 'error').length;
+        summaryText.textContent = `${successful} file(s) uploaded successfully${failed > 0 ? `, ${failed} failed` : ''}`;
+        uploadSummary.classList.remove('hidden');
+
+        // Show retry button if there are failed uploads
+        if (failed > 0) {
+          retryBtn.style.display = 'block';
+        }
+      });
+
+      retryBtn.addEventListener('click', async () => {
+        console.log('Retry button clicked');
+
+        if (isUploading) {
+          console.log('Already uploading, ignoring click');
+          return;
+        }
+
+        // Count failed uploads
+        const failedUploads = fileUploads.filter((f) => f.status === 'error');
+
+        if (failedUploads.length === 0) {
+          console.log('No failed uploads to retry');
+          return;
+        }
+
+        console.log(`Retrying ${failedUploads.length} failed upload(s)`);
+
+        isUploading = true;
+        uploadBtn.disabled = true;
+        clearBtn.disabled = true;
+        retryBtn.disabled = true;
+        retryBtn.textContent = 'Retrying...';
+        uploadSummary.classList.add('hidden');
+
+        // Reset failed uploads to pending
+        failedUploads.forEach((upload) => {
+          upload.status = 'pending';
+          upload.progress = 0;
+          upload.error = undefined;
+        });
+        renderFileQueue();
+
+        try {
+          await uploadAllFiles();
+        } catch (error) {
+          console.error('Error during retry:', error);
+          alert('An error occurred during retry. Check console for details.');
+        }
+
+        retryBtn.textContent = 'Retry Failed';
+        retryBtn.disabled = false;
+        clearBtn.disabled = false;
+        isUploading = false;
+
+        // Show summary
+        const successful = fileUploads.filter(
+          (f) => f.status === 'success'
+        ).length;
+        const failed = fileUploads.filter((f) => f.status === 'error').length;
+        summaryText.textContent = `${successful} file(s) uploaded successfully${failed > 0 ? `, ${failed} failed` : ''}`;
+        uploadSummary.classList.remove('hidden');
+
+        // Hide retry button if all succeeded
+        if (failed === 0) {
+          retryBtn.style.display = 'none';
+        }
+      });
+    }
+
+    function loadFiles() {
+      console.log('loadFiles() called');
+      if (!fileInput.files) {
+        console.error('No files found');
+        return;
+      }
+
+      console.log('Converting FileList to array...');
+      try {
+        fileUploads = Array.from(fileInput.files).map((file) => {
+          console.log(
+            `File: ${file.name}, Size: ${file.size}, Type: ${file.type}`
+          );
+          return {
+            file,
+            id: generateUUID(),
+            status: 'pending' as FileStatus,
+            progress: 0,
+          };
+        });
+
+        console.log(`Loaded ${fileUploads.length} files`);
+        selectedCountSpan.textContent = fileUploads.length.toString();
+        selectedFilesDiv.classList.remove('hidden');
+        renderFileQueue();
+      } catch (error) {
+        console.error('Error in loadFiles:', error);
+        throw error;
+      }
+    }
+
+    function renderFileQueue() {
+      console.log(`renderFileQueue() called with ${fileUploads.length} files`);
+      try {
+        filesQueue.innerHTML = fileUploads
+          .map(
+            (upload) => `
+            <div class="border border-slate-700 rounded-lg p-4" id="file-${upload.id}">
+              <div class="flex items-start gap-3">
+                <div class="shrink-0 mt-1">
+                  ${getStatusIcon(upload.status)}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-medium text-gray-200 truncate">${upload.file.name}</p>
+                  <p class="text-sm text-gray-400">${formatFileSize(upload.file.size)}</p>
+                  ${upload.status === 'error' && upload.error ? `<p class="text-sm text-red-400 mt-1">${upload.error}</p>` : ''}
+                  ${
+                    upload.status === 'uploading' || upload.status === 'hashing'
+                      ? `
+                    <div class="mt-2">
+                      <div class="flex justify-between text-xs text-gray-400 mb-1">
+                        <span>${getStatusText(upload.status)}</span>
+                        <span>${upload.progress}%</span>
+                      </div>
+                      <div class="w-full bg-slate-700 rounded-full h-2">
+                        <div class="bg-indigo-600 h-2 rounded-full transition-all duration-300" style="width: ${upload.progress}%"></div>
+                      </div>
+                    </div>
+                  `
+                      : ''
+                  }
+                </div>
+              </div>
+            </div>
+          `
+          )
+          .join('');
+        console.log('renderFileQueue() completed successfully');
+      } catch (error) {
+        console.error('Error in renderFileQueue:', error);
+        throw error;
+      }
+    }
+
+    function updateFileStatus(
+      id: string,
+      status: FileStatus,
+      progress: number = 0,
+      error?: string
+    ) {
+      const upload = fileUploads.find((f) => f.id === id);
+      if (upload) {
+        upload.status = status;
+        upload.progress = progress;
+        upload.error = error;
+        renderFileQueue();
+      }
+    }
+
+    function getStatusIcon(status: FileStatus): string {
+      const icons = {
+        pending: `<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>`,
+        hashing: `<svg class="w-5 h-5 text-blue-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>`,
+        uploading: `<svg class="w-5 h-5 text-indigo-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>`,
+        success: `<svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>`,
+        error: `<svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>`,
+      };
+      return icons[status];
+    }
+
+    function getStatusText(status: FileStatus): string {
+      const texts = {
+        pending: 'Pending',
+        hashing: 'Calculating hash',
+        uploading: 'Uploading',
+        success: 'Complete',
+        error: 'Failed',
+      };
+      return texts[status];
+    }
+
+    async function uploadAllFiles() {
+      for (const upload of fileUploads) {
+        if (upload.status !== 'pending') continue;
+
+        try {
+          await uploadFile(upload);
+        } catch (error) {
+          console.error(`Failed to upload ${upload.file.name}:`, error);
+          updateFileStatus(
+            upload.id,
+            'error',
+            0,
+            error instanceof Error ? error.message : 'Upload failed'
+          );
+        }
+      }
+    }
+
+    function getTodayFolder(): string {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    async function uploadFile(upload: FileUpload) {
+      const { file, id } = upload;
+
+      // Step 1: Get upload URL with date-based path
+      updateFileStatus(id, 'hashing', 10);
+
+      const todayFolder = getTodayFolder();
+      const fileNameWithPath = `${todayFolder}/${file.name}`;
+
+      const response = await fetch('/api/b2/get-upload-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileName: fileNameWithPath,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = (await response.json()) as { error?: string };
+        throw new Error(error.error || 'Failed to get upload URL');
+      }
+
+      const { uploadUrl, authorizationToken } = (await response.json()) as {
+        uploadUrl: string;
+        authorizationToken: string;
+      };
+
+      // Step 2: Calculate SHA1 hash (if crypto.subtle is available)
+      updateFileStatus(id, 'hashing', 30);
+      let sha1 = 'do_not_verify';
+
+      try {
+        if (
+          typeof crypto !== 'undefined' &&
+          typeof crypto.subtle !== 'undefined' &&
+          typeof crypto.subtle.digest === 'function'
+        ) {
+          const arrayBuffer = await file.arrayBuffer();
+          const hashBuffer = await crypto.subtle.digest('SHA-1', arrayBuffer);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          sha1 = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+          console.log('SHA1 hash calculated:', sha1);
+        } else {
+          console.warn(
+            'crypto.subtle.digest not available, using do_not_verify'
+          );
+        }
+      } catch (error) {
+        console.warn('Failed to calculate SHA1, using do_not_verify:', error);
+      }
+
+      // Step 3: Upload to B2
+      updateFileStatus(id, 'uploading', 50);
+
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: authorizationToken,
+          'X-Bz-File-Name': encodeURIComponent(fileNameWithPath),
+          'Content-Type': file.type || 'application/octet-stream',
+          'X-Bz-Content-Sha1': sha1,
+        },
+        body: file,
+      });
+
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        throw new Error(`Upload failed: ${errorText}`);
+      }
+
+      updateFileStatus(id, 'uploading', 100);
+
+      // Small delay to show 100% before success
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      updateFileStatus(id, 'success', 100);
+    }
+
+    function formatFileSize(bytes: number): string {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    // File Browser functionality
+    const viewFilesBtn = document.getElementById('view-files-btn');
+    const fileBrowserModal = document.getElementById('file-browser-modal');
+    const closeBrowserBtn = document.getElementById('close-browser-btn');
+    const folderSelect = document.getElementById(
+      'folder-select'
+    ) as HTMLSelectElement;
+    const filesLoading = document.getElementById('files-loading');
+    const filesGrid = document.getElementById('files-grid');
+    const noFiles = document.getElementById('no-files');
+
+    // Image Viewer functionality
+    const imageViewerModal = document.getElementById('image-viewer-modal');
+    const closeViewerBtn = document.getElementById('close-viewer-btn');
+    const viewerFilename = document.getElementById('viewer-filename');
+    const viewerImage = document.getElementById(
+      'viewer-image'
+    ) as HTMLImageElement;
+    const viewerPrevBtn = document.getElementById('viewer-prev-btn');
+    const viewerNextBtn = document.getElementById('viewer-next-btn');
+    const viewerCarousel = document.getElementById('viewer-carousel');
+
+    let currentFiles: Array<{
+      fileName: string;
+      fileId: string;
+      contentLength: number;
+    }> = [];
+    let currentImageIndex = 0;
+
+    if (viewFilesBtn && fileBrowserModal) {
+      viewFilesBtn.addEventListener('click', async () => {
+        fileBrowserModal.classList.remove('hidden');
+        await loadFolders();
+      });
+    }
+
+    if (closeBrowserBtn && fileBrowserModal) {
+      closeBrowserBtn.addEventListener('click', () => {
+        fileBrowserModal.classList.add('hidden');
+      });
+    }
+
+    if (closeViewerBtn && imageViewerModal) {
+      closeViewerBtn.addEventListener('click', () => {
+        imageViewerModal.classList.add('hidden');
+      });
+    }
+
+    if (viewerPrevBtn) {
+      viewerPrevBtn.addEventListener('click', () => {
+        if (currentImageIndex > 0) {
+          showImageAtIndex(currentImageIndex - 1);
+        }
+      });
+    }
+
+    if (viewerNextBtn) {
+      viewerNextBtn.addEventListener('click', () => {
+        if (currentImageIndex < currentFiles.length - 1) {
+          showImageAtIndex(currentImageIndex + 1);
+        }
+      });
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (imageViewerModal && !imageViewerModal.classList.contains('hidden')) {
+        if (e.key === 'ArrowLeft' && currentImageIndex > 0) {
+          showImageAtIndex(currentImageIndex - 1);
+        } else if (
+          e.key === 'ArrowRight' &&
+          currentImageIndex < currentFiles.length - 1
+        ) {
+          showImageAtIndex(currentImageIndex + 1);
+        } else if (e.key === 'Escape') {
+          imageViewerModal.classList.add('hidden');
+        }
+      }
+    });
+
+    if (folderSelect) {
+      folderSelect.addEventListener('change', async () => {
+        if (folderSelect.value) {
+          await loadFilesInFolder(folderSelect.value);
+        }
+      });
+    }
+
+    async function loadFolders() {
+      try {
+        const response = await fetch('/api/b2/list-folders');
+        if (!response.ok) {
+          throw new Error('Failed to load folders');
+        }
+
+        const data = (await response.json()) as { folders: string[] };
+
+        if (folderSelect) {
+          folderSelect.innerHTML =
+            data.folders.length > 0
+              ? data.folders
+                  .map(
+                    (folder) => `<option value="${folder}">${folder}</option>`
+                  )
+                  .join('')
+              : '<option value="">No folders found</option>';
+
+          // Auto-load today's folder if it exists
+          const todayFolder = getTodayFolder();
+          if (data.folders.includes(todayFolder)) {
+            folderSelect.value = todayFolder;
+            await loadFilesInFolder(todayFolder);
+          } else if (data.folders.length > 0) {
+            folderSelect.value = data.folders[0];
+            await loadFilesInFolder(data.folders[0]);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading folders:', error);
+        if (folderSelect) {
+          folderSelect.innerHTML =
+            '<option value="">Error loading folders</option>';
+        }
+      }
+    }
+
+    async function loadFilesInFolder(folder: string) {
+      if (!filesLoading || !filesGrid || !noFiles) return;
+
+      filesLoading.classList.remove('hidden');
+      filesGrid.classList.add('hidden');
+      noFiles.classList.add('hidden');
+
+      try {
+        const response = await fetch(
+          `/api/b2/list-files?folder=${encodeURIComponent(folder)}`
+        );
+        if (!response.ok) {
+          throw new Error('Failed to load files');
+        }
+
+        const data = (await response.json()) as {
+          files: Array<{
+            fileName: string;
+            fileId: string;
+            contentLength: number;
+          }>;
+        };
+
+        filesLoading.classList.add('hidden');
+
+        if (data.files.length === 0) {
+          noFiles.classList.remove('hidden');
+        } else {
+          currentFiles = data.files; // Store for navigation
+          filesGrid.classList.remove('hidden');
+          filesGrid.innerHTML = data.files
+            .map((file, index) => {
+              const displayName =
+                file.fileName.split('/').pop() || file.fileName;
+              return `
+              <div class="border border-slate-700 rounded-lg overflow-hidden hover:border-indigo-500 cursor-pointer transition-colors"
+                   onclick="openImageViewer(${index})">
+                <div class="aspect-square bg-slate-800 flex items-center justify-center">
+                  <svg class="w-12 h-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div class="p-2">
+                  <p class="text-xs text-gray-300 truncate">${displayName}</p>
+                  <p class="text-xs text-gray-500">${formatFileSize(file.contentLength)}</p>
+                </div>
+              </div>
+            `;
+            })
+            .join('');
+        }
+      } catch (error) {
+        console.error('Error loading files:', error);
+        filesLoading.classList.add('hidden');
+        noFiles.classList.remove('hidden');
+        if (noFiles) {
+          noFiles.textContent = 'Error loading files';
+        }
+      }
+    }
+
+    (window as any).openImageViewer = function (index: number) {
+      if (!imageViewerModal) return;
+      currentImageIndex = index;
+      imageViewerModal.classList.remove('hidden');
+      renderCarousel();
+      showImageAtIndex(index);
+    };
+
+    function renderCarousel() {
+      if (!viewerCarousel) return;
+
+      viewerCarousel.innerHTML = currentFiles
+        .map((file, index) => {
+          const displayName = file.fileName.split('/').pop() || file.fileName;
+          const isActive = index === currentImageIndex;
+          return `
+            <button
+              onclick="showImageAtIndex(${index})"
+              class="shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                isActive
+                  ? 'border-indigo-500 ring-2 ring-indigo-500 ring-opacity-50'
+                  : 'border-gray-700 hover:border-gray-500'
+              }"
+              aria-label="View ${displayName}"
+            >
+              <div class="w-full h-full bg-slate-800 flex items-center justify-center">
+                <svg class="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+            </button>
+          `;
+        })
+        .join('');
+    }
+
+    (window as any).showImageAtIndex = async function (index: number) {
+      if (index < 0 || index >= currentFiles.length) return;
+      if (!viewerImage || !viewerFilename || !viewerPrevBtn || !viewerNextBtn)
+        return;
+
+      currentImageIndex = index;
+      const file = currentFiles[index];
+      const displayName = file.fileName.split('/').pop() || file.fileName;
+
+      try {
+        // Show loading state
+        viewerFilename.textContent = `Loading ${displayName}... (${index + 1}/${currentFiles.length})`;
+        viewerImage.src = '';
+
+        // Update button states
+        viewerPrevBtn.disabled = index === 0;
+        viewerPrevBtn.style.opacity = index === 0 ? '0.3' : '1';
+        viewerPrevBtn.style.cursor = index === 0 ? 'not-allowed' : 'pointer';
+
+        viewerNextBtn.disabled = index === currentFiles.length - 1;
+        viewerNextBtn.style.opacity =
+          index === currentFiles.length - 1 ? '0.3' : '1';
+        viewerNextBtn.style.cursor =
+          index === currentFiles.length - 1 ? 'not-allowed' : 'pointer';
+
+        // Update carousel
+        renderCarousel();
+
+        // Scroll carousel to show current thumbnail
+        if (viewerCarousel) {
+          const thumbnails = viewerCarousel.children;
+          if (thumbnails[index]) {
+            (thumbnails[index] as HTMLElement).scrollIntoView({
+              behavior: 'smooth',
+              block: 'nearest',
+              inline: 'center',
+            });
+          }
+        }
+
+        // Fetch the image through our proxy endpoint
+        const response = await fetch(
+          `/api/b2/download-file?fileId=${encodeURIComponent(file.fileId)}`
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to download image');
+        }
+
+        // Convert to blob and create object URL
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
+        // Display the image
+        viewerFilename.textContent = `${displayName} (${index + 1}/${currentFiles.length})`;
+        viewerImage.src = blobUrl;
+
+        // Clean up old blob URL
+        const oldSrc = viewerImage.dataset.blobUrl;
+        if (oldSrc) {
+          URL.revokeObjectURL(oldSrc);
+        }
+        viewerImage.dataset.blobUrl = blobUrl;
+      } catch (error) {
+        console.error('Error viewing image:', error);
+        alert('Failed to load image');
+      }
+    };
+  </script>
+</Layout>

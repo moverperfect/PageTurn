@@ -124,6 +124,18 @@ if (!isLoggedIn) {
                     class="hover:text-indigo-400 transition-colors">Import</a
                   >
                 </li>
+                {
+                  isAdmin && (
+                    <li>
+                      <a
+                        href="/b2upload"
+                        class="hover:text-indigo-400 transition-colors"
+                      >
+                        B2 Upload
+                      </a>
+                    </li>
+                  )
+                }
               </ul>
 
               {
