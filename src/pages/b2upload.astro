@@ -339,6 +339,7 @@ const isAuthorized = user.role === 'admin';
 
     interface FileUpload {
       file: File;
+      fileData?: ArrayBuffer; // Store file data for reliable retry on mobile
       id: string;
       status: FileStatus;
       progress: number;
@@ -431,6 +432,13 @@ const isAuthorized = user.role === 'admin';
       fileInput.addEventListener('input', handleFileSelection);
 
       clearBtn.addEventListener('click', () => {
+        // Free memory for all cached files
+        fileUploads.forEach((upload) => {
+          if (upload.fileData) {
+            delete upload.fileData;
+          }
+        });
+
         fileInput.value = '';
         fileUploads = [];
         uploadBtn.disabled = true;
@@ -438,6 +446,7 @@ const isAuthorized = user.role === 'admin';
         retryBtn.style.display = 'none';
         selectedFilesDiv.classList.add('hidden');
         uploadSummary.classList.add('hidden');
+        console.log('Cleared all files and freed memory');
       });
 
       uploadBtn.addEventListener('click', async () => {
@@ -707,10 +716,29 @@ const isAuthorized = user.role === 'admin';
     }
 
     async function uploadFile(upload: FileUpload) {
-      const { file, id } = upload;
+      const { file, id, fileData: cachedData } = upload;
 
-      // Step 1: Get upload URL with date-based path
+      // Step 1: Read file into memory (if not already cached from previous retry)
       updateFileStatus(id, 'hashing', 10);
+      let fileData: ArrayBuffer;
+
+      if (cachedData) {
+        // Use cached data from previous failed attempt (for retry)
+        console.log(`Using cached data for ${file.name} (retry)`);
+        fileData = cachedData;
+      } else {
+        // First attempt: read file from File object
+        console.log(`Reading ${file.name} for first time`);
+        try {
+          fileData = await file.arrayBuffer();
+        } catch (error) {
+          console.error('Failed to read file:', error);
+          throw new Error('Failed to read file. Please try again.');
+        }
+      }
+
+      // Step 2: Get upload URL with date-based path
+      updateFileStatus(id, 'hashing', 30);
 
       const username = window.currentUser?.name || 'unknown';
       const todayFolder = getTodayFolder(username);
@@ -736,18 +764,15 @@ const isAuthorized = user.role === 'admin';
         authorizationToken: string;
       };
 
-      // Step 2: Calculate SHA1 hash (if crypto.subtle is available)
-      updateFileStatus(id, 'hashing', 30);
+      // Step 3: Calculate SHA1 hash
       let sha1 = 'do_not_verify';
-
       try {
         if (
           typeof crypto !== 'undefined' &&
           typeof crypto.subtle !== 'undefined' &&
           typeof crypto.subtle.digest === 'function'
         ) {
-          const arrayBuffer = await file.arrayBuffer();
-          const hashBuffer = await crypto.subtle.digest('SHA-1', arrayBuffer);
+          const hashBuffer = await crypto.subtle.digest('SHA-1', fileData);
           const hashArray = Array.from(new Uint8Array(hashBuffer));
           sha1 = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
           console.log('SHA1 hash calculated:', sha1);
@@ -760,7 +785,7 @@ const isAuthorized = user.role === 'admin';
         console.warn('Failed to calculate SHA1, using do_not_verify:', error);
       }
 
-      // Step 3: Upload to B2
+      // Step 4: Upload to B2
       updateFileStatus(id, 'uploading', 50);
 
       const uploadResponse = await fetch(uploadUrl, {
@@ -771,11 +796,16 @@ const isAuthorized = user.role === 'admin';
           'Content-Type': file.type || 'application/octet-stream',
           'X-Bz-Content-Sha1': sha1,
         },
-        body: file,
+        body: fileData,
       });
 
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text();
+        // Cache file data for retry (only on failure)
+        if (!upload.fileData) {
+          upload.fileData = fileData;
+          console.log(`Cached ${file.name} in memory for retry`);
+        }
         throw new Error(`Upload failed: ${errorText}`);
       }
 
@@ -785,6 +815,18 @@ const isAuthorized = user.role === 'admin';
       await new Promise((resolve) => setTimeout(resolve, 200));
 
       updateFileStatus(id, 'success', 100);
+
+      // Clean up cached data on success (if it was cached from a previous failure)
+      if (upload.fileData) {
+        delete upload.fileData;
+        console.log(
+          `Freed cached memory for ${file.name} after successful upload`
+        );
+      } else {
+        console.log(
+          `Successfully uploaded ${file.name} (memory was not cached)`
+        );
+      }
     }
 
     function formatFileSize(bytes: number): string {
