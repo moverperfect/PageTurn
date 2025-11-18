@@ -21,8 +21,8 @@ importers:
         specifier: 4.1.17
         version: 4.1.17(vite@6.3.6(@types/node@22.16.5)(jiti@2.6.1)(lightningcss@1.30.2)(yaml@2.7.1))
       '@types/uuid':
-        specifier: 10.0.0
-        version: 10.0.0
+        specifier: 11.0.0
+        version: 11.0.0
       astro:
         specifier: 5.14.8
         version: 5.14.8(@types/node@22.16.5)(jiti@2.6.1)(lightningcss@1.30.2)(rollup@4.40.0)(typescript@5.9.3)(yaml@2.7.1)
@@ -1245,8 +1245,9 @@ packages:
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
 
-  '@types/uuid@10.0.0':
-    resolution: {integrity: sha512-7gqG38EyHgyP1S+7+xomFtL+ZNHcKv6DwNaCZmJmo1vgMugyF3TCnXVg4t1uk89mLNwnLtnY3TpOpCOyp1/xHQ==}
+  '@types/uuid@11.0.0':
+    resolution: {integrity: sha512-HVyk8nj2m+jcFRNazzqyVKiZezyhDKrGUA3jlEcg/nZ6Ms+qHwocba1Y/AaVaznJTAM9xpdFSh+ptbNrhOGvZA==}
+    deprecated: This is a stub types definition. uuid provides its own type definitions, so you do not need this installed.
 
   '@types/ws@8.18.1':
     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
@@ -4141,7 +4142,9 @@ snapshots:
 
   '@types/unist@3.0.3': {}
 
-  '@types/uuid@10.0.0': {}
+  '@types/uuid@11.0.0':
+    dependencies:
+      uuid: 11.1.0
 
   '@types/ws@8.18.1':
     dependencies:
