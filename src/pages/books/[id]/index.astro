@@ -270,7 +270,7 @@ function formatDate(dateString: string): string {
               <div class="pt-4">
                 <a
                   href={`/reading-sessions/new?bookId=${id}`}
-                  class="btn block w-full flex justify-center"
+                  class="btn block w-full flex justify-center mb-2"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -285,6 +285,24 @@ function formatDate(dateString: string): string {
                     />
                   </svg>
                   Log Reading Session
+                </a>
+                <a
+                  href={`/reading-sessions/live?bookid=${id}`}
+                  class="btn-success block w-full flex justify-center"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-5 w-5 mr-2"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  Start Live Reading Session
                 </a>
               </div>
             </div>
