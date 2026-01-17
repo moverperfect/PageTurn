@@ -31,7 +31,7 @@ importers:
         version: 1.3.34
       drizzle-orm:
         specifier: 0.44.7
-        version: 0.44.7(@cloudflare/workers-types@4.20251118.0)(@libsql/client@0.15.15)(@prisma/client@6.6.0(prisma@6.6.0(typescript@5.9.3))(typescript@5.9.3))(@types/better-sqlite3@7.6.13)(better-sqlite3@12.2.0)(kysely@0.28.5)(prisma@6.6.0(typescript@5.9.3))
+        version: 0.44.7(@cloudflare/workers-types@4.20251118.0)(@libsql/client@0.15.15)(@prisma/client@6.6.0(prisma@6.6.0(typescript@5.9.3))(typescript@5.9.3))(@types/better-sqlite3@7.6.13)(better-sqlite3@12.6.2)(kysely@0.28.5)(prisma@6.6.0(typescript@5.9.3))
       uuid:
         specifier: 11.1.0
         version: 11.1.0
@@ -43,8 +43,8 @@ importers:
         specifier: 22.16.5
         version: 22.16.5
       better-sqlite3:
-        specifier: 12.2.0
-        version: 12.2.0
+        specifier: 12.6.2
+        version: 12.6.2
       cross-env:
         specifier: 7.0.3
         version: 7.0.3
@@ -1392,9 +1392,9 @@ packages:
   better-call@1.0.19:
     resolution: {integrity: sha512-sI3GcA1SCVa3H+CDHl8W8qzhlrckwXOTKhqq3OOPXjgn5aTOMIqGY34zLY/pHA6tRRMjTUC3lz5Mi7EbDA24Kw==}
 
-  better-sqlite3@12.2.0:
-    resolution: {integrity: sha512-eGbYq2CT+tos1fBwLQ/tkBt9J5M3JEHjku4hbvQUePCckkvVf14xWj+1m7dGoK81M/fOjFT7yM9UMeKT/+vFLQ==}
-    engines: {node: 20.x || 22.x || 23.x || 24.x}
+  better-sqlite3@12.6.2:
+    resolution: {integrity: sha512-8VYKM3MjCa9WcaSAI3hzwhmyHVlH8tiGFwf0RlTsZPWJ1I5MkzjiudCo4KC4DxOaL/53A5B1sI/IbldNFDbsKA==}
+    engines: {node: 20.x || 22.x || 23.x || 24.x || 25.x}
 
   bindings@1.5.0:
     resolution: {integrity: sha512-p2q/t/mhvuOj/UeLlV6566GD/guowlr0hHxClI0W9m7MWYkL1F0hLo+0Aexs9HSPCtR1SXQ0TD3MMKrXZajbiQ==}
@@ -1556,10 +1556,6 @@ packages:
 
   detect-libc@2.0.2:
     resolution: {integrity: sha512-UX6sGumvvqSaXgdKGUsgZWqcUyIXZ/vZTrlRT/iobiKhGL0zL4d3osHj3uqllWJK+i+sixDS/3COVEOFbupFyw==}
-    engines: {node: '>=8'}
-
-  detect-libc@2.0.4:
-    resolution: {integrity: sha512-3UDv+G9CsCKO1WKMGw9fwq/SWJYbI0c5Y7LU1AXYoDdbhE2AHQ6N6Nb34sG8Fj7T5APy8qXDCKuuIHd1BR0tVA==}
     engines: {node: '>=8'}
 
   detect-libc@2.1.1:
@@ -4381,7 +4377,7 @@ snapshots:
       set-cookie-parser: 2.7.1
       uncrypto: 0.1.3
 
-  better-sqlite3@12.2.0:
+  better-sqlite3@12.6.2:
     dependencies:
       bindings: 1.5.0
       prebuild-install: 7.1.3
@@ -4527,8 +4523,6 @@ snapshots:
 
   detect-libc@2.0.2: {}
 
-  detect-libc@2.0.4: {}
-
   detect-libc@2.1.1: {}
 
   deterministic-object-hash@2.0.2:
@@ -4558,13 +4552,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.44.7(@cloudflare/workers-types@4.20251118.0)(@libsql/client@0.15.15)(@prisma/client@6.6.0(prisma@6.6.0(typescript@5.9.3))(typescript@5.9.3))(@types/better-sqlite3@7.6.13)(better-sqlite3@12.2.0)(kysely@0.28.5)(prisma@6.6.0(typescript@5.9.3)):
+  drizzle-orm@0.44.7(@cloudflare/workers-types@4.20251118.0)(@libsql/client@0.15.15)(@prisma/client@6.6.0(prisma@6.6.0(typescript@5.9.3))(typescript@5.9.3))(@types/better-sqlite3@7.6.13)(better-sqlite3@12.6.2)(kysely@0.28.5)(prisma@6.6.0(typescript@5.9.3)):
     optionalDependencies:
       '@cloudflare/workers-types': 4.20251118.0
       '@libsql/client': 0.15.15
       '@prisma/client': 6.6.0(prisma@6.6.0(typescript@5.9.3))(typescript@5.9.3)
       '@types/better-sqlite3': 7.6.13
-      better-sqlite3: 12.2.0
+      better-sqlite3: 12.6.2
       kysely: 0.28.5
       prisma: 6.6.0(typescript@5.9.3)
 
@@ -5474,7 +5468,7 @@ snapshots:
 
   prebuild-install@7.1.3:
     dependencies:
-      detect-libc: 2.0.4
+      detect-libc: 2.1.1
       expand-template: 2.0.3
       github-from-package: 0.0.0
       minimist: 1.2.8
