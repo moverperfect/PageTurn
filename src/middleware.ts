@@ -1,4 +1,5 @@
 import { getAuth } from "./lib/auth";
+import { jsonResponse } from "./lib/api-auth";
 import { defineMiddleware } from "astro:middleware";
 
 export const onRequest = defineMiddleware(async (context, next) => {
@@ -13,19 +14,26 @@ export const onRequest = defineMiddleware(async (context, next) => {
     isAuthed = null;
   }
 
-  const isPublicPath = (path: string) => {
-    return path === "/login" || path.startsWith("/api/auth");
-  };
-
-  // If the user is not authenticated and the path is not /login or /api/auth/*, redirect to /login
-  if (!isPublicPath(context.url.pathname) && !isAuthed) {
-    return context.redirect("/login");
-  }
   if (isAuthed) {
     context.locals.session = {
       Session: isAuthed.session,
       User: isAuthed.user
     };
+    return next();
   }
-  return next();
+
+  const path = context.url.pathname;
+  const isLoginPath = path === "/login";
+  const isAuthApiRoute = path === "/api/auth" || path.startsWith("/api/auth/");
+  const isApiRoute = path.startsWith("/api/");
+
+  if (isLoginPath || isAuthApiRoute) {
+    return next();
+  }
+
+  if (isApiRoute) {
+    return jsonResponse({ error: 'Unauthorized' }, 401);
+  }
+
+  return context.redirect("/login");
 });

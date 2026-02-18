@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
-import { addBook, addReadingSession, getBookByTitleAndAuthor, updateBook, getBookById } from '../../lib/db';
+import { addBook, addReadingSession, getBookByTitleAndAuthorForUser, updateBook, getBookById } from '../../lib/db';
 import type { ReadingSession, Book } from '../../lib/schema';
+import { getAuthenticatedUserId, jsonResponse, unauthorizedResponse } from '../../lib/api-auth';
 
 interface ImportRequestBody {
   sheetId: string;
@@ -227,7 +228,7 @@ async function convertToReadingSessions(sheetData: any[], env: Env, userId: stri
     let book: Book | undefined;
 
     if (row.title && row.author) {
-      book = await getBookByTitleAndAuthor(row.title, row.author, env);
+      book = await getBookByTitleAndAuthorForUser(row.title, row.author, userId, env);
       if (!book) {
         throw new Error(`Book not found: ${row.title} by ${row.author}`);
       }
@@ -236,7 +237,7 @@ async function convertToReadingSessions(sheetData: any[], env: Env, userId: stri
       // Assuming library book # is the book ID
       bookId = row['library book #'];
       book = await getBookById(bookId, env);
-      if (!book) {
+      if (!book || book.userId !== userId) {
         throw new Error(`Book not found with ID: ${bookId}`);
       }
     }
@@ -331,15 +332,18 @@ async function convertToReadingSessions(sheetData: any[], env: Env, userId: stri
 }
 
 export const POST: APIRoute = async ({ request, locals }) => {
+  const userId = getAuthenticatedUserId(locals);
+
+  if (!userId) {
+    return unauthorizedResponse();
+  }
+
   try {
     const requestData = await request.json() as ImportRequestBody;
     const { sheetId, sheetName = 'Sheet1', type = 'books' } = requestData;
 
     if (!sheetId) {
-      return new Response(
-        JSON.stringify({ error: 'Sheet ID is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({ error: 'Sheet ID is required' }, 400);
     }
 
     // Fetch data from Google Sheets
@@ -349,67 +353,50 @@ export const POST: APIRoute = async ({ request, locals }) => {
       // Convert to Book objects
       const books = convertToBooks(sheetData);
 
-      // Verify that user is authenticated
-      if (!locals.session?.User?.id) {
-        throw new Error('User must be authenticated to import books');
-      }
-
       // Add books to the database
       // Create an array of promises for adding books
       const bookPromises = books.map(bookData => {
         // Ensure userId is included in the book data
-        return addBook({ ...bookData, userId: locals.session.User.id }, locals.runtime.env);
+        return addBook({ ...bookData, userId }, locals.runtime.env);
       });
 
       // Wait for all books to be added
       const addedBooks = await Promise.all(bookPromises);
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          imported: addedBooks.length,
-          books: addedBooks
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({
+        success: true,
+        imported: addedBooks.length,
+        books: addedBooks
+      });
     } else if (type === 'sessions') {
       // Convert to ReadingSession objects
-      if (!locals.session?.User?.id) {
-        throw new Error('User must be authenticated to import reading sessions');
-      }
       const sessions = await convertToReadingSessions(
         sheetData,
         locals.runtime.env,
-        locals.session.User.id
+        userId
       );
 
       // Add sessions to the database
       // Create an array of promises for adding sessions
-      const sessionPromises = sessions.map(sessionData => addReadingSession(sessionData, locals.runtime.env, locals.session.User.id));
+      const sessionPromises = sessions.map(sessionData => addReadingSession(sessionData, locals.runtime.env, userId));
 
       // Wait for all sessions to be added
       const addedSessions = await Promise.all(sessionPromises);
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          imported: addedSessions.length,
-          sessions: addedSessions
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({
+        success: true,
+        imported: addedSessions.length,
+        sessions: addedSessions
+      });
     } else {
-      throw new Error(`Invalid import type: ${type}`);
+      return jsonResponse({ error: `Invalid import type: ${type}` }, 400);
     }
   } catch (error) {
     console.error('Import error:', error);
 
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unknown error during import'
-      }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({
+      error: error instanceof Error ? error.message : 'Unknown error during import'
+    }, 500);
   }
 };
 

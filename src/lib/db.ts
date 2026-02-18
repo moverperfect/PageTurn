@@ -443,3 +443,26 @@ export async function getBookByTitleAndAuthor(title: string, author: string, env
     throw new Error(`Failed to get book by title and author: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
+
+/**
+ * Retrieves a user's book by matching title and author with case-insensitive comparison.
+ */
+export async function getBookByTitleAndAuthorForUser(title: string, author: string, userId: string, env: Env): Promise<Book | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db
+      .select()
+      .from(books)
+      .where(
+        and(
+          eq(books.userId, userId),
+          sql`LOWER(${books.title}) = LOWER(${title})`,
+          sql`LOWER(${books.author}) = LOWER(${author})`
+        )
+      );
+    return results[0];
+  } catch (error) {
+    console.error('Error getting book by title and author for user:', error);
+    throw new Error(`Failed to get book by title and author for user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
