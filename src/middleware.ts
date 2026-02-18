@@ -17,8 +17,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return path === "/login" || path.startsWith("/api/auth");
   };
 
-  // If the user is not authenticated and the path is not /login or /api/auth/*, redirect to /login
-  if (!isPublicPath(context.url.pathname) && !isAuthed) {
+  // Allow API routes to handle their own authentication (e.g., token-based auth for mobile)
+  const isApiRoute = (path: string) => {
+    return path.startsWith("/api/");
+  };
+
+  // If the user is not authenticated and the path is not /login or /api/*, redirect to /login
+  if (!isPublicPath(context.url.pathname) && !isApiRoute(context.url.pathname) && !isAuthed) {
     return context.redirect("/login");
   }
   if (isAuthed) {
