@@ -307,6 +307,8 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
 </Layout>
 
 <script>
+  import { formatDuration } from '../../lib/format';
+
   document.addEventListener('DOMContentLoaded', () => {
     // DOM Elements
     const bookIdSelect = document.getElementById(
@@ -366,15 +368,15 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
     ) as HTMLElement | null;
 
     // Timer variables and state management
-    const TIMER_STORAGE_KEY = 'reading_session_timer';
     const TIMER_BOOK_KEY = 'reading_session_book';
     const TIMER_START_PAGE_KEY = 'reading_session_start_page';
     const TIMER_SEGMENTS_KEY = 'reading_session_segments';
 
     let isRunning = false;
-    let timerInterval = null;
+    let timerInterval: ReturnType<typeof setInterval> | null = null;
     let totalElapsedMs = 0;
-    let currentSegmentStartTime = null;
+    let currentSegmentStartTime: number | null = null;
+    let lastSaveTime = 0;
 
     // Store segments as [startTime, endTime] pairs
     // If a segment is active, endTime will be null
@@ -613,7 +615,6 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
 
     // Clear timer state
     function clearTimerState() {
-      localStorage.removeItem(TIMER_STORAGE_KEY);
       localStorage.removeItem(TIMER_BOOK_KEY);
       localStorage.removeItem(TIMER_START_PAGE_KEY);
       localStorage.removeItem(TIMER_SEGMENTS_KEY);
@@ -621,20 +622,6 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
       totalElapsedMs = 0;
       isRunning = false;
       currentSegmentStartTime = null;
-    }
-
-    // Format time as HH:MM:SS
-    function formatTime(totalSeconds) {
-      const hours = Math.floor(totalSeconds / 3600)
-        .toString()
-        .padStart(2, '0');
-      const minutes = Math.floor((totalSeconds % 3600) / 60)
-        .toString()
-        .padStart(2, '0');
-      const seconds = Math.floor(totalSeconds % 60)
-        .toString()
-        .padStart(2, '0');
-      return `${hours}:${minutes}:${seconds}`;
     }
 
     // Update the timer display
@@ -645,7 +632,7 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
 
         // Convert to seconds and format
         const totalSeconds = Math.floor(total / 1000);
-        timerDisplay.textContent = formatTime(totalSeconds);
+        timerDisplay.textContent = formatDuration(totalSeconds);
       }
     }
 
@@ -700,14 +687,17 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
         timerInterval = window.setInterval(() => {
           updateTimerDisplay();
 
-          // Save state periodically
-          if (Math.floor(calculateTotalElapsedTime() / 1000) % 10 === 0) {
+          // Save state periodically (every 10 seconds)
+          const now = Date.now();
+          if (now - lastSaveTime >= 10000) {
             saveTimerState();
+            lastSaveTime = now;
           }
         }, 100);
 
         // Save state immediately
         saveTimerState();
+        lastSaveTime = Date.now();
       }
     }
 
@@ -797,12 +787,19 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
         if (cancelBtn) cancelBtn.disabled = true;
         if (readStatus) readStatus.classList.add('hidden');
         if (finishSection) finishSection.classList.add('hidden');
-        if (bookIdSelect) bookIdSelect.disabled = false;
-        if (startPageInput) startPageInput.disabled = false;
+        if (bookIdSelect) {
+          bookIdSelect.disabled = false;
+          bookIdSelect.value = '';
+        }
+        if (startPageInput) {
+          startPageInput.disabled = false;
+          startPageInput.value = '';
+        }
+        if (endPageInput) endPageInput.value = '';
+        if (finishedCheckbox) finishedCheckbox.checked = false;
+        if (statsSection) statsSection.classList.add('hidden');
+        if (saveBtn) saveBtn.disabled = true;
         if (timerDisplay) timerDisplay.textContent = '00:00:00';
-
-        // Reload the page for a fresh start
-        window.location.reload();
       }
     }
 
@@ -833,7 +830,7 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
 
       if (pagesReadStat) pagesReadStat.textContent = pagesRead.toString();
       if (timeReadStat)
-        timeReadStat.textContent = formatTime(
+        timeReadStat.textContent = formatDuration(
           Math.floor(totalElapsedMs / 1000)
         );
 
@@ -948,9 +945,11 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
           timerInterval = window.setInterval(() => {
             updateTimerDisplay();
 
-            // Save state periodically
-            if (Math.floor(calculateTotalElapsedTime() / 1000) % 10 === 0) {
+            // Save state periodically (every 10 seconds)
+            const now = Date.now();
+            if (now - lastSaveTime >= 10000) {
               saveTimerState();
+              lastSaveTime = now;
             }
           }, 100);
         }
