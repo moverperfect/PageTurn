@@ -53,7 +53,30 @@ export function getAuth(env: Env) {
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
       throw new Error('Missing Google OAuth credentials in environment variables');
     }
+    const baseUrlHost = new URL(env.BETTER_AUTH_URL).hostname;
+    const cookieDomain =
+      baseUrlHost.startsWith("localhost") || baseUrlHost.includes("127.0.0.1")
+        ? undefined
+        : `.${baseUrlHost}`;
+
     authInstance = betterAuth({
+      baseURL: env.BETTER_AUTH_URL,
+      trustedOrigins: [
+        env.BETTER_AUTH_URL,
+        ...(env.CF_PAGES_URL && env.CF_PAGES_URL !== env.BETTER_AUTH_URL
+          ? [env.CF_PAGES_URL]
+          : []),
+      ],
+      ...(cookieDomain && env.CF_PAGES_URL
+        ? {
+            advanced: {
+              crossSubDomainCookies: {
+                enabled: true,
+                domain: cookieDomain,
+              },
+            },
+          }
+        : {}),
       database: drizzleAdapter(getDbClient(env), {
         provider: "sqlite",
       }),

@@ -1,9 +1,18 @@
 ---
 import Layout from '../layouts/Layout.astro';
+
+// When on a preview deployment, we need the full callback URL for OAuth redirect
+const isPreview =
+  Astro.locals.runtime?.env?.CF_PAGES_URL &&
+  Astro.locals.runtime.env.CF_PAGES_URL !== Astro.locals.runtime.env.BETTER_AUTH_URL;
+const callbackURL = isPreview ? `${Astro.url.origin}/` : '/';
 ---
 
 <Layout title="Login | PageTurn">
-  <div class="flex flex-col items-center justify-center min-h-[60vh]">
+  <div
+    class="flex flex-col items-center justify-center min-h-[60vh]"
+    data-callback-url={callbackURL}
+  >
     <div class="card max-w-md w-full">
       <div class="text-center mb-8">
         <h1
@@ -75,13 +84,15 @@ import Layout from '../layouts/Layout.astro';
 
         const loginButton = document.getElementById('github-login');
         const googleLoginButton = document.getElementById('google-login');
+        const callbackURL =
+          document.querySelector('[data-callback-url]')?.getAttribute('data-callback-url') || '/';
 
         if (loginButton) {
           loginButton.addEventListener('click', async () => {
             try {
               authClient.signIn.social({
                 provider: 'github',
-                callbackURL: '/',
+                callbackURL,
               });
             } catch (err) {
               console.error('GitHub login failed', err);
@@ -95,7 +106,7 @@ import Layout from '../layouts/Layout.astro';
             try {
               authClient.signIn.social({
                 provider: 'google',
-                callbackURL: '/',
+                callbackURL,
               });
             } catch (err) {
               console.error('Google login failed', err);
