@@ -72,7 +72,20 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
   try {
     const updates = await request.json() as Partial<Omit<Book, 'id'>>;
     const existingBook = await getBookById(id!, locals.runtime.env);
-    if (existingBook && existingBook.userId !== userId) {
+
+    if (!existingBook) {
+      return new Response(
+        JSON.stringify({ error: 'Book not found' }),
+        {
+          status: 404,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+
+    if (existingBook.userId !== userId) {
       return new Response(
         JSON.stringify({ error: 'Forbidden' }),
         {
@@ -136,7 +149,20 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
   }
 
   const book = await getBookById(id!, locals.runtime.env);
-  if (book && book.userId !== userId) {
+
+  if (!book) {
+    return new Response(
+      JSON.stringify({ error: 'Book not found' }),
+      {
+        status: 404,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+  }
+
+  if (book.userId !== userId) {
     return new Response(
       JSON.stringify({ error: 'Forbidden' }),
       {

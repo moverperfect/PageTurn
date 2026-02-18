@@ -1,6 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { getAllBooks, getAllBooksForUser } from '../../lib/db';
+import { getAllBooksForUser } from '../../lib/db';
 
 // Get all books for the current user that are not finished
 let books = [];
@@ -380,7 +380,7 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
 
     // Store segments as [startTime, endTime] pairs
     // If a segment is active, endTime will be null
-    let timerSegments = [];
+    let timerSegments: [number, number | null][] = [];
 
     // Fetch the latest reading session for a book to suggest the starting page
     async function fetchLatestReadingSession(bookId: string) {
@@ -450,9 +450,19 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
         }
       } catch (error) {
         console.error('Error fetching data for start page calculation:', error);
-        // In case of failure, don't show any suggestion
+        // In case of failure, don't show any suggestion but show brief error feedback
         if (suggestedPageMsg) {
           suggestedPageMsg.classList.add('hidden');
+          const parent = suggestedPageMsg.parentNode;
+          const existingError = parent?.querySelector('.suggestion-error');
+          if (parent && !existingError) {
+            const errorNotice = document.createElement('p');
+            errorNotice.className = 'suggestion-error text-xs text-red-300 mt-1';
+            errorNotice.textContent =
+              'Could not retrieve your previous reading progress.';
+            parent.appendChild(errorNotice);
+            setTimeout(() => errorNotice.remove(), 5000);
+          }
         }
       }
     }
@@ -504,8 +514,29 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
           return;
         }
 
-        // Parse the segments
-        timerSegments = JSON.parse(savedSegments);
+        // Parse and validate the segments
+        let parsedSegments: [number, number | null][];
+        try {
+          const parsed = JSON.parse(savedSegments);
+          if (
+            !Array.isArray(parsed) ||
+            !parsed.every(
+              (item: unknown) =>
+                Array.isArray(item) &&
+                item.length === 2 &&
+                typeof item[0] === 'number' &&
+                (typeof item[1] === 'number' || item[1] === null)
+            )
+          ) {
+            throw new Error('Invalid segment structure');
+          }
+          parsedSegments = parsed as [number, number | null][];
+        } catch (parseError) {
+          console.error('Invalid timer state in localStorage:', parseError);
+          clearTimerState();
+          return;
+        }
+        timerSegments = parsedSegments;
 
         // Calculate total elapsed time from segments
         totalElapsedMs = calculateTotalElapsedTime();
@@ -579,25 +610,24 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
     }
 
     // Calculate total elapsed time from all segments
+    // Active segments (end === null) are always counted; no dependency on isRunning
     function calculateTotalElapsedTime() {
       if (!timerSegments || timerSegments.length === 0) {
         return 0;
       }
 
-      let total = 0;
       const now = Date.now();
 
-      timerSegments.forEach(([start, end]) => {
+      return timerSegments.reduce((total, [start, end]) => {
         if (start && end) {
           // Completed segment
-          total += end - start;
-        } else if (start && end === null && isRunning) {
-          // Active segment
-          total += now - start;
+          return total + (end - start);
+        } else if (start && end === null) {
+          // Active segment (end === null indicates running)
+          return total + (now - start);
         }
-      });
-
-      return total;
+        return total;
+      }, 0);
     }
 
     // Save timer state
@@ -809,10 +839,12 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
     }
 
     function validateEndConditions() {
-      return (
-        endPageInput?.value &&
-        parseInt(endPageInput.value) >= parseInt(startPageInput?.value || '0')
-      );
+      const startVal = startPageInput?.value?.trim();
+      const endVal = endPageInput?.value?.trim();
+      if (!startVal || !endVal) return false;
+      const startPage = parseInt(startVal, 10);
+      const endPage = parseInt(endVal, 10);
+      return !isNaN(startPage) && !isNaN(endPage) && endPage >= startPage;
     }
 
     function calculateStats() {
@@ -894,6 +926,17 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
           finished: finishedCheckbox?.checked || false,
         };
 
+        // Set loading state
+        saveBtn.disabled = true;
+        const originalText = saveBtn.innerHTML;
+        saveBtn.innerHTML = `
+          <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Saving...
+        `;
+
         try {
           const response = await fetch('/api/reading-sessions', {
             method: 'POST',
@@ -915,6 +958,9 @@ const bookId = Astro.url.searchParams.get('bookid') || '';
         } catch (error) {
           console.error('Error saving reading session:', error);
           alert('Failed to save reading session. Please try again.');
+          // Restore button state
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = originalText;
         }
       });
     }
