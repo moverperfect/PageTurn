@@ -61,12 +61,32 @@ export function getAuth(env: Env) {
 
     authInstance = betterAuth({
       baseURL: env.BETTER_AUTH_URL,
-      trustedOrigins: [
-        env.BETTER_AUTH_URL,
-        ...(env.CF_PAGES_URL && env.CF_PAGES_URL !== env.BETTER_AUTH_URL
-          ? [env.CF_PAGES_URL]
-          : []),
-      ],
+      trustedOrigins: (request) => {
+        const origins = [env.BETTER_AUTH_URL];
+        const requestOrigin = request.headers.get("Origin");
+        if (requestOrigin) {
+          try {
+            const originHost = new URL(requestOrigin).hostname;
+            // Allow same origin and subdomains (e.g. pr-123.pageturn.moverperfect.com)
+            const isCustomDomain =
+              originHost === baseUrlHost ||
+              originHost.endsWith(`.${baseUrlHost}`);
+            // Allow Cloudflare Pages preview URLs (e.g. *.pageturn-3xg.pages.dev)
+            const isPagesPreview =
+              originHost === "pageturn-3xg.pages.dev" ||
+              originHost.endsWith(".pageturn-3xg.pages.dev");
+            if (isCustomDomain || isPagesPreview) {
+              origins.push(requestOrigin);
+            }
+          } catch {
+            // Invalid Origin header, ignore
+          }
+        }
+        if (env.CF_PAGES_URL && env.CF_PAGES_URL !== env.BETTER_AUTH_URL) {
+          origins.push(env.CF_PAGES_URL);
+        }
+        return origins;
+      },
       ...(cookieDomain && env.CF_PAGES_URL
         ? {
             advanced: {
