@@ -1,9 +1,24 @@
 import type { APIRoute } from 'astro';
 import type { ReadingSession } from '../../lib/schema';
-import { getAllReadingSessions, addReadingSession, updateBook, getBookById } from '../../lib/db';
+import { getAllReadingSessionsForUser, addReadingSession, updateBook, getBookById } from '../../lib/db';
 
 export const GET: APIRoute = async ({ locals }) => {
-  const sessions = await getAllReadingSessions(locals.runtime.env);
+  if (!locals.session?.User?.id) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+  }
+
+  const sessions = await getAllReadingSessionsForUser(
+    locals.session.User.id,
+    locals.runtime.env
+  );
 
   return new Response(
     JSON.stringify(sessions),
