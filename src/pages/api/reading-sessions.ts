@@ -17,6 +17,18 @@ export const GET: APIRoute = async ({ locals }) => {
 };
 
 export const POST: APIRoute = async ({ request, locals }) => {
+  if (!locals.session?.User?.id) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+  }
+
   try {
     const sessionData = await request.json() as Omit<ReadingSession, 'id'>;
     const newSession = await addReadingSession(sessionData, locals.runtime.env, locals.session.User.id);
