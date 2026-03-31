@@ -1,9 +1,24 @@
 import type { APIRoute } from 'astro';
 import type { ReadingSession } from '../../lib/schema';
-import { getAllReadingSessions, addReadingSession, updateBook, getBookById } from '../../lib/db';
+import { getAllReadingSessionsForUser, addReadingSession, updateBook, getBookById } from '../../lib/db';
 
 export const GET: APIRoute = async ({ locals }) => {
-  const sessions = await getAllReadingSessions(locals.runtime.env);
+  if (!locals.session?.User?.id) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+  }
+
+  const sessions = await getAllReadingSessionsForUser(
+    locals.session.User.id,
+    locals.runtime.env
+  );
 
   return new Response(
     JSON.stringify(sessions),
@@ -17,6 +32,18 @@ export const GET: APIRoute = async ({ locals }) => {
 };
 
 export const POST: APIRoute = async ({ request, locals }) => {
+  if (!locals.session?.User?.id) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+  }
+
   try {
     const sessionData = await request.json() as Omit<ReadingSession, 'id'>;
     const newSession = await addReadingSession(sessionData, locals.runtime.env, locals.session.User.id);
