@@ -1,31 +1,58 @@
 import type { APIRoute } from 'astro';
 import type { ReadingSession } from '../../lib/schema';
-import { getAllReadingSessions, addReadingSession, updateBook, getBookById } from '../../lib/db';
+import { getAllReadingSessionsForUser, addReadingSession, updateBook, getBookById } from '../../lib/db';
+import { forbiddenResponse, getAuthenticatedUserId, jsonResponse, unauthorizedResponse } from '../../lib/api-auth';
 
 export const GET: APIRoute = async ({ locals }) => {
-  const sessions = await getAllReadingSessions(locals.runtime.env);
+  const userId = getAuthenticatedUserId(locals);
 
-  return new Response(
-    JSON.stringify(sessions),
-    {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    }
-  );
+  if (!userId) {
+    return unauthorizedResponse();
+  }
+
+  const sessions = await getAllReadingSessionsForUser(userId, locals.runtime.env);
+
+  return jsonResponse(sessions);
 };
 
 export const POST: APIRoute = async ({ request, locals }) => {
+  const userId = getAuthenticatedUserId(locals);
+
+  if (!userId) {
+    return unauthorizedResponse();
+  }
+
   try {
     const sessionData = await request.json() as Omit<ReadingSession, 'id'>;
-    const newSession = await addReadingSession(sessionData, locals.runtime.env, locals.session.User.id);
+
+    if (!sessionData.bookId) {
+      return jsonResponse({ error: 'Book ID is required' }, 400);
+    }
+    if (typeof sessionData.pagesRead !== 'number' || sessionData.pagesRead < 0) {
+      return jsonResponse({ error: 'Pages read must be a non-negative number' }, 400);
+    }
+    if (typeof sessionData.duration !== 'number' || sessionData.duration < 0) {
+      return jsonResponse({ error: 'Duration must be a non-negative number of seconds' }, 400);
+    }
+
+    const book = await getBookById(sessionData.bookId, locals.runtime.env);
+
+    if (!book) {
+      return jsonResponse({ error: 'Book not found' }, 404);
+    }
+    if (book.userId !== userId) {
+      return forbiddenResponse();
+    }
+
+    const newSession = await addReadingSession(
+      { ...sessionData, userId },
+      locals.runtime.env,
+      userId
+    );
 
     // If the session marks the book as finished, update the book's finished status
     if (sessionData.finished) {
-      // Get the book
       try {
-        const book = await getBookById(sessionData.bookId, locals.runtime.env);
         if (book && !book.finished) {
           // Update the book's finished status
           await updateBook(sessionData.bookId, { finished: true }, locals.runtime.env);
@@ -35,24 +62,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
     }
 
-    return new Response(
-      JSON.stringify(newSession),
-      {
-        status: 201,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    return jsonResponse(newSession, 201);
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid session data' }),
-      {
-        status: 400,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    return jsonResponse({ error: 'Invalid session data' }, 400);
   }
 }; 
