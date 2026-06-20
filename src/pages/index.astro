@@ -1,4 +1,5 @@
 ---
+import { env } from 'cloudflare:workers';
 import Layout from '../layouts/Layout.astro';
 import {
   calculateProgress,
@@ -14,14 +15,14 @@ if (!userId) {
 }
 const currentlyReadingBooks = await getCurrentlyReadingBooksForUser(
   userId,
-  Astro.locals.runtime.env
+  env
 );
 
 // Get only the reading sessions for the books being currently read
 const currentBookIds = currentlyReadingBooks.map((book) => book.id);
 const relevantSessions = await getReadingSessionsForBooks(
   currentBookIds,
-  Astro.locals.runtime.env
+  env
 );
 
 // Calculate statistics for each book

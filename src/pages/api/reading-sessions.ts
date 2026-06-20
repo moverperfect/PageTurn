@@ -1,3 +1,4 @@
+import { env } from 'cloudflare:workers';
 import type { APIRoute } from 'astro';
 import type { ReadingSession } from '../../lib/schema';
 import { getAllReadingSessionsForUser, addReadingSession, updateBook, getBookById } from '../../lib/db';
@@ -10,7 +11,7 @@ export const GET: APIRoute = async ({ locals }) => {
     return unauthorizedResponse();
   }
 
-  const sessions = await getAllReadingSessionsForUser(userId, locals.runtime.env);
+  const sessions = await getAllReadingSessionsForUser(userId, env);
 
   return jsonResponse(sessions);
 };
@@ -35,7 +36,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       return jsonResponse({ error: 'Duration must be a non-negative number of seconds' }, 400);
     }
 
-    const book = await getBookById(sessionData.bookId, locals.runtime.env);
+    const book = await getBookById(sessionData.bookId, env);
 
     if (!book) {
       return jsonResponse({ error: 'Book not found' }, 404);
@@ -46,7 +47,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     const newSession = await addReadingSession(
       { ...sessionData, userId },
-      locals.runtime.env,
+      env,
       userId
     );
 
@@ -55,7 +56,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       try {
         if (book && !book.finished) {
           // Update the book's finished status
-          await updateBook(sessionData.bookId, { finished: true }, locals.runtime.env);
+          await updateBook(sessionData.bookId, { finished: true }, env);
         }
       } catch (error) {
         console.error('Error updating book finished status:', error);

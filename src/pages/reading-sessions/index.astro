@@ -1,4 +1,5 @@
 ---
+import { env } from 'cloudflare:workers';
 import Layout from '../../layouts/Layout.astro';
 import { getAllReadingSessionsForUser, getBookById } from '../../lib/db';
 import { formatDuration } from '../../lib/format';
@@ -9,7 +10,7 @@ if (!userId) {
 }
 const sessions = await getAllReadingSessionsForUser(
   userId,
-  Astro.locals.runtime.env
+  env
 );
 
 // Format date in UK format (DD/MM/YYYY)
@@ -34,7 +35,7 @@ function formatDate(dateString: string): string {
 // Get book information for each session
 const sessionsWithBookInfo = await Promise.all(
   sessions.map(async (session) => {
-    const book = await getBookById(session.bookId, Astro.locals.runtime.env);
+    const book = await getBookById(session.bookId, env);
     return {
       ...session,
       bookTitle: book?.title || 'Unknown Book',

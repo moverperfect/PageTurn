@@ -1,8 +1,14 @@
 ---
+import { env } from 'cloudflare:workers';
 import Layout from '../../layouts/Layout.astro';
-import { getAllBooks } from '../../lib/db';
+import { getAllBooksForUser } from '../../lib/db';
 
-const books = await getAllBooks(Astro.locals.runtime.env);
+const userId = Astro.locals.session?.User?.id;
+if (!userId) {
+  return Astro.redirect('/login');
+}
+
+const books = await getAllBooksForUser(userId, env);
 
 // Get bookId from URL query parameters
 const bookId = Astro.url.searchParams.get('bookId') || '';

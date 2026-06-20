@@ -1,3 +1,4 @@
+import { env } from 'cloudflare:workers';
 import type { APIRoute } from 'astro';
 import { addBook, addReadingSession, getBookByTitleAndAuthorForUser, updateBook, getBookById } from '../../lib/db';
 import type { ReadingSession, Book } from '../../lib/schema';
@@ -357,7 +358,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       // Create an array of promises for adding books
       const bookPromises = books.map(bookData => {
         // Ensure userId is included in the book data
-        return addBook({ ...bookData, userId }, locals.runtime.env);
+        return addBook({ ...bookData, userId }, env);
       });
 
       // Wait for all books to be added
@@ -372,13 +373,13 @@ export const POST: APIRoute = async ({ request, locals }) => {
       // Convert to ReadingSession objects
       const sessions = await convertToReadingSessions(
         sheetData,
-        locals.runtime.env,
+        env,
         userId
       );
 
       // Add sessions to the database
       // Create an array of promises for adding sessions
-      const sessionPromises = sessions.map(sessionData => addReadingSession(sessionData, locals.runtime.env, userId));
+      const sessionPromises = sessions.map(sessionData => addReadingSession(sessionData, env, userId));
 
       // Wait for all sessions to be added
       const addedSessions = await Promise.all(sessionPromises);

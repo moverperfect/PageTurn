@@ -1,4 +1,5 @@
 ---
+import { env } from 'cloudflare:workers';
 import Layout from '../../layouts/Layout.astro';
 import { addBook } from '../../lib/db';
 
@@ -83,7 +84,7 @@ if (Astro.request.method === 'POST') {
     }
     await addBook(
       { ...book, userId: Astro.locals.session.User.id },
-      Astro.locals.runtime.env
+      env
     );
     return Astro.redirect('/books');
   } catch (error) {

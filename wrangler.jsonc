@@ -5,11 +5,22 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "pageturn",
+  "main": "@astrojs/cloudflare/entrypoints/server",
   "compatibility_date": "2025-04-21",
   "compatibility_flags": ["nodejs_compat"],
-  "pages_build_output_dir": "./dist",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
   "observability": {
     "enabled": true
+  },
+  "vars": {
+    "BETTER_AUTH_URL": "https://pageturn.moverperfect.com",
+    // Dynamic Workers previews use the request URL as the OAuth proxy current URL.
+    "AUTH_PREVIEW_URL": "",
+    "AUTH_TRUSTED_ORIGINS": "https://pageturn.moverperfect.com",
+    "WORKERS_PREVIEW_HOST_SUFFIX": "-pageturn.moverperfect.workers.dev"
   },
 
   /**
@@ -31,22 +42,6 @@
       "database_id": "45ee565a-8c44-40c6-b85e-fa914a0ec67e"
     }
   ]
-
-  /**
-   * Environment Variables
-   * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
-   */
-  // "vars": { "MY_VARIABLE": "production_value" },
-  /**
-   * Note: Use secrets to store sensitive data.
-   * https://developers.cloudflare.com/workers/configuration/secrets/
-   */
-
-  /**
-   * Static Assets
-   * https://developers.cloudflare.com/workers/static-assets/binding/
-   */
-  // "assets": { "directory": "./public/", "binding": "ASSETS" },
 
   /**
    * Service Bindings (communicate between multiple Workers)

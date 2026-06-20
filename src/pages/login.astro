@@ -1,11 +1,11 @@
 ---
+import { env } from 'cloudflare:workers';
 import Layout from '../layouts/Layout.astro';
 
-// When on a preview deployment, we need the full callback URL for OAuth redirect
-const isPreview =
-  Astro.locals.runtime?.env?.CF_PAGES_URL &&
-  Astro.locals.runtime.env.CF_PAGES_URL !== Astro.locals.runtime.env.BETTER_AUTH_URL;
-const callbackURL = isPreview ? `${Astro.url.origin}/` : '/';
+// Preview deployments use production auth callbacks, so return to the preview origin explicitly.
+const authOrigin = new URL(env.BETTER_AUTH_URL).origin;
+const isAlternateOrigin = Astro.url.origin !== authOrigin;
+const callbackURL = isAlternateOrigin ? `${Astro.url.origin}/` : '/';
 ---
 
 <Layout title="Login | PageTurn">

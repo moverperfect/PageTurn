@@ -4,7 +4,6 @@
 /// <reference types="astro/client" />
 type Session = import("better-auth").Session;
 type BaseUser = import("better-auth").User;
-type Runtime = import("@astrojs/cloudflare").Runtime<Env>;
 
 // Extend the User type to include additional fields
 interface User extends BaseUser {
@@ -12,7 +11,7 @@ interface User extends BaseUser {
 }
 
 declare namespace App {
-  interface Locals extends Runtime {
+  interface Locals {
     session: { Session: Session, User: User };
   }
 }
