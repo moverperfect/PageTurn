@@ -33,6 +33,7 @@ Workers preview URLs do not provide `CF_PAGES_URL`. Configure preview auth expli
 - `AUTH_PREVIEW_URL`: the current preview origin used by Better Auth's OAuth proxy; leave empty for dynamic Workers preview hosts
 - `AUTH_TRUSTED_ORIGINS`: comma-separated extra allowed origins, including `https://pageturn.moverperfect.com`
 - `WORKERS_PREVIEW_HOST_SUFFIX`: workers.dev host suffix for branch previews, such as `-pageturn.moverperfect.workers.dev`
+- `OAUTH_PROXY_SECRET`: Cloudflare secret shared by production and preview deployments so Better Auth can complete proxied OAuth callbacks
 
 ## Database Management
 

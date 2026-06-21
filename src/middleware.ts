@@ -6,7 +6,7 @@ import { defineMiddleware } from "astro:middleware";
 export const onRequest = defineMiddleware(async (context, next) => {
   let isAuthed;
   try {
-    isAuthed = await getAuth(env).api
+    isAuthed = await getAuth(env, context.request).api
       .getSession({
         headers: context.request.headers,
       });
