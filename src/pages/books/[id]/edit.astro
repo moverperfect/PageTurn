@@ -1,4 +1,5 @@
 ---
+import { env } from 'cloudflare:workers';
 import Layout from '../../../layouts/Layout.astro';
 import { getBookById } from '../../../lib/db';
 
@@ -6,7 +7,7 @@ import { getBookById } from '../../../lib/db';
 const { id } = Astro.params;
 
 // Fetch the book
-const book = await getBookById(id!, Astro.locals.runtime.env);
+const book = await getBookById(id!, env);
 
 // Handle case where book is not found
 if (!book) {

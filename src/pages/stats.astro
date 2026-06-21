@@ -1,4 +1,5 @@
 ---
+import { env } from 'cloudflare:workers';
 import Layout from '../layouts/Layout.astro';
 import { getAllBooksForUser, getAllReadingSessionsForUser, getBookById } from '../lib/db';
 
@@ -6,8 +7,8 @@ const userId = Astro.locals.session?.User?.id;
 if (!userId) {
   throw new Error('User not authenticated');
 }
-const books = await getAllBooksForUser(userId, Astro.locals.runtime.env);
-const sessions = await getAllReadingSessionsForUser(userId, Astro.locals.runtime.env);
+const books = await getAllBooksForUser(userId, env);
+const sessions = await getAllReadingSessionsForUser(userId, env);
 
 // Calculate overall stats
 const totalBooks = books.length;
@@ -48,7 +49,7 @@ const recentSessions = await Promise.all(
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 7)
     .map(async session => {
-      const book = await getBookById(session.bookId, Astro.locals.runtime.env);
+      const book = await getBookById(session.bookId, env);
       return {
         ...session,
         bookTitle: book?.title || 'Unknown Book',

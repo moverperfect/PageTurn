@@ -1,3 +1,4 @@
+import { env } from 'cloudflare:workers';
 import type { APIRoute } from 'astro';
 import type { Book } from '../../lib/schema';
 import { getAllBooksForUser, addBook } from '../../lib/db';
@@ -9,7 +10,7 @@ export const GET: APIRoute = async ({ locals }) => {
       { status: 401, headers: { 'Content-Type': 'application/json' } }
     );
   }
-  const allBooks = await getAllBooksForUser(locals.session.User.id, locals.runtime.env);
+  const allBooks = await getAllBooksForUser(locals.session.User.id, env);
 
   return new Response(
     JSON.stringify(allBooks),
@@ -39,7 +40,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       ...bookData,
       userId: locals.session.User.id
     };
-    const newBook = await addBook(bookWithUser, locals.runtime.env);
+    const newBook = await addBook(bookWithUser, env);
 
     return new Response(
       JSON.stringify(newBook),

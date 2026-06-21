@@ -1,3 +1,4 @@
+import { env } from 'cloudflare:workers';
 import type { APIRoute } from 'astro';
 import type { ReadingSession } from '../../../lib/schema';
 import { updateReadingSession, deleteReadingSession, getReadingSessionById, getBookById, updateBook } from '../../../lib/db';
@@ -14,7 +15,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
     return jsonResponse({ error: 'Reading session ID is required' }, 400);
   }
 
-  const session = await getReadingSessionById(id, locals.runtime.env);
+  const session = await getReadingSessionById(id, env);
 
   if (!session) {
     return jsonResponse({ error: 'Reading session not found' }, 404);
@@ -37,7 +38,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
     return jsonResponse({ error: 'Reading session ID is required' }, 400);
   }
 
-  const existingSession = await getReadingSessionById(id, locals.runtime.env);
+  const existingSession = await getReadingSessionById(id, env);
 
   if (!existingSession) {
     return jsonResponse({ error: 'Reading session not found' }, 404);
@@ -56,7 +57,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
     }
 
     const targetBookId = updates.bookId ?? existingSession.bookId;
-    const targetBook = await getBookById(targetBookId, locals.runtime.env);
+    const targetBook = await getBookById(targetBookId, env);
 
     if (!targetBook) {
       return jsonResponse({ error: 'Book not found' }, 404);
@@ -66,7 +67,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
     }
 
     const { id: _ignoredId, userId: _ignoredUserId, ...sessionUpdates } = updates;
-    const updatedSession = await updateReadingSession(id, sessionUpdates, locals.runtime.env);
+    const updatedSession = await updateReadingSession(id, sessionUpdates, env);
 
     if (!updatedSession) {
       return jsonResponse({ error: 'Reading session not found' }, 404);
@@ -77,7 +78,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
       try {
         if (!targetBook.finished) {
           // Update the book's finished status
-          await updateBook(updatedSession.bookId, { finished: true }, locals.runtime.env);
+          await updateBook(updatedSession.bookId, { finished: true }, env);
         }
       } catch (error) {
         console.error('Error updating book finished status:', error);
@@ -101,7 +102,7 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
     return jsonResponse({ error: 'Reading session ID is required' }, 400);
   }
 
-  const session = await getReadingSessionById(id, locals.runtime.env);
+  const session = await getReadingSessionById(id, env);
 
   if (!session) {
     return jsonResponse({ error: 'Reading session not found' }, 404);
@@ -110,7 +111,7 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
     return forbiddenResponse();
   }
 
-  const deleted = await deleteReadingSession(id, locals.runtime.env);
+  const deleted = await deleteReadingSession(id, env);
 
   return jsonResponse(deleted, deleted ? 200 : 404);
 }; 

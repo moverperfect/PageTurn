@@ -1,3 +1,4 @@
+import { env } from 'cloudflare:workers';
 import type { APIRoute } from 'astro';
 import type { Book } from '../../../lib/schema';
 import { getBookById, updateBook, deleteBook } from '../../../lib/db';
@@ -14,7 +15,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
     return jsonResponse({ error: 'Book ID is required' }, 400);
   }
 
-  const book = await getBookById(id, locals.runtime.env);
+  const book = await getBookById(id, env);
 
   if (!book) {
     return jsonResponse({ error: 'Book not found' }, 404);
@@ -37,7 +38,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
     return jsonResponse({ error: 'Book ID is required' }, 400);
   }
 
-  const book = await getBookById(id, locals.runtime.env);
+  const book = await getBookById(id, env);
 
   if (!book) {
     return jsonResponse({ error: 'Book not found' }, 404);
@@ -49,7 +50,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
   try {
     const updates = await request.json() as Partial<Book>;
     const { id: _ignoredId, userId: _ignoredUserId, ...bookUpdates } = updates;
-    const updatedBook = await updateBook(id, bookUpdates, locals.runtime.env);
+    const updatedBook = await updateBook(id, bookUpdates, env);
 
     if (!updatedBook) {
       return jsonResponse({ error: 'Book not found' }, 404);
@@ -72,7 +73,7 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
     return jsonResponse({ error: 'Book ID is required' }, 400);
   }
 
-  const book = await getBookById(id, locals.runtime.env);
+  const book = await getBookById(id, env);
 
   if (!book) {
     return jsonResponse({ error: 'Book not found' }, 404);
@@ -81,7 +82,7 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
     return forbiddenResponse();
   }
 
-  const deleted = await deleteBook(id, locals.runtime.env);
+  const deleted = await deleteBook(id, env);
 
   return jsonResponse(deleted, deleted ? 200 : 404);
 }; 

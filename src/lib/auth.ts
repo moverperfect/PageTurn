@@ -6,6 +6,33 @@ import { admin, oAuthProxy, oneTap } from "better-auth/plugins";
 // Singleton auth client
 let authInstance: ReturnType<typeof betterAuth>;
 
+function splitOrigins(origins?: string) {
+  return origins
+    ?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean) ?? [];
+}
+
+function hostMatchesSuffix(host: string, suffix?: string) {
+  if (!suffix) return false;
+
+  const normalizedSuffix =
+    suffix.startsWith(".") || suffix.startsWith("-") ? suffix : `.${suffix}`;
+  const bareSuffix = normalizedSuffix.startsWith(".")
+    ? normalizedSuffix.slice(1)
+    : normalizedSuffix;
+  return host === bareSuffix || host.endsWith(normalizedSuffix);
+}
+
+function parseTrustedOrigin(origin: string) {
+  try {
+    return new URL(origin).origin;
+  } catch {
+    console.warn(`Invalid origin in AUTH_TRUSTED_ORIGINS: ${origin}`);
+    return null;
+  }
+}
+
 // Static auth config for CLI generation
 // The CLI only needs the configuration, not an actual initialized instance
 export const auth = betterAuth({
@@ -29,7 +56,7 @@ export const auth = betterAuth({
       bannedUserMessage: "Your account has been suspended. Please contact support if you believe this is an error."
     }),
     oAuthProxy({
-      currentURL: process.env.CF_PAGES_URL,
+      currentURL: process.env.AUTH_PREVIEW_URL || process.env.BETTER_AUTH_URL,
       productionURL: process.env.BETTER_AUTH_URL,
     })
   ]
@@ -71,23 +98,26 @@ export function getAuth(env: Env) {
             const isCustomDomain =
               originHost === baseUrlHost ||
               originHost.endsWith(`.${baseUrlHost}`);
-            // Allow Cloudflare Pages preview URLs (e.g. *.pageturn-3xg.pages.dev)
-            const isPagesPreview =
-              originHost === "pageturn-3xg.pages.dev" ||
-              originHost.endsWith(".pageturn-3xg.pages.dev");
-            if (isCustomDomain || isPagesPreview) {
+            const isWorkersPreview = hostMatchesSuffix(
+              originHost,
+              env.WORKERS_PREVIEW_HOST_SUFFIX
+            );
+            if (isCustomDomain || isWorkersPreview) {
               origins.push(requestOrigin);
             }
           } catch {
             // Invalid Origin header, ignore
           }
         }
-        if (env.CF_PAGES_URL && env.CF_PAGES_URL !== env.BETTER_AUTH_URL) {
-          origins.push(env.CF_PAGES_URL);
+        for (const origin of splitOrigins(env.AUTH_TRUSTED_ORIGINS)) {
+          const trustedOrigin = parseTrustedOrigin(origin);
+          if (trustedOrigin) {
+            origins.push(trustedOrigin);
+          }
         }
         return origins;
       },
-      ...(cookieDomain && env.CF_PAGES_URL
+      ...(cookieDomain
         ? {
             advanced: {
               crossSubDomainCookies: {
@@ -114,7 +144,7 @@ export function getAuth(env: Env) {
       },
       plugins: [
         oAuthProxy({
-          currentURL: env.CF_PAGES_URL || env.BETTER_AUTH_URL,
+          currentURL: env.AUTH_PREVIEW_URL || undefined,
           productionURL: env.BETTER_AUTH_URL,
         }),
         oneTap(),

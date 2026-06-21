@@ -1,4 +1,5 @@
 ---
+import { env } from 'cloudflare:workers';
 import Layout from '../../../layouts/Layout.astro';
 import {
   getBookById,
@@ -10,7 +11,7 @@ import {
 const { id } = Astro.params;
 
 // Fetch the book data
-const book = await getBookById(id!, Astro.locals.runtime.env);
+const book = await getBookById(id!, env);
 
 // Handle case where book is not found
 if (!book) {
@@ -20,7 +21,7 @@ if (!book) {
 // Get reading sessions for this book
 const readingSessions = await getReadingSessionsForBook(
   id!,
-  Astro.locals.runtime.env
+  env
 );
 
 // Calculate progress

@@ -1,19 +1,24 @@
 ---
+import { env } from 'cloudflare:workers';
 import Layout from '../../../layouts/Layout.astro';
-import { getAllBooks, getReadingSessionById } from '../../../lib/db';
+import { getAllBooksForUser, getReadingSessionById } from '../../../lib/db';
 
 // Get the session ID from URL params
 const { id } = Astro.params;
 
-const session = await getReadingSessionById(id!, Astro.locals.runtime.env);
+const session = await getReadingSessionById(id!, env);
 
 // Handle case where session is not found
 if (!session) {
   return Astro.redirect('/reading-sessions');
 }
 
-// Fetch all books for the dropdown
-const books = await getAllBooks(Astro.locals.runtime.env);
+const userId = Astro.locals.session?.User?.id;
+if (!userId || session.userId !== userId) {
+  return Astro.redirect('/reading-sessions');
+}
+
+const books = await getAllBooksForUser(userId, env);
 
 // Format seconds to HH:MM:SS
 function formatDuration(seconds: number): string {

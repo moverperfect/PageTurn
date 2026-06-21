@@ -1,4 +1,5 @@
 ---
+import { env } from 'cloudflare:workers';
 import Layout from '../../layouts/Layout.astro';
 import { getAllBooksForUser } from '../../lib/db';
 import type { Book } from '../../lib/schema';
@@ -7,7 +8,7 @@ import type { Book } from '../../lib/schema';
 let books: Book[] = [];
 if (Astro.locals.session?.User?.id) {
   const userId = Astro.locals.session.User.id;
-  const allBooks = await getAllBooksForUser(userId, Astro.locals.runtime.env);
+  const allBooks = await getAllBooksForUser(userId, env);
   // Filter out finished books
   books = allBooks.filter((book) => !book.finished);
 } else {

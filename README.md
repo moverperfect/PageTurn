@@ -14,29 +14,37 @@ PageTurn is a modern reading tracker application that helps you monitor your rea
 
 - [Astro](https://astro.build) - The web framework for content-driven websites
 - [TailwindCSS](https://tailwindcss.com) - A utility-first CSS framework
-- [Cloudflare Pages](https://pages.cloudflare.com) - For hosting and deployment
+- [Cloudflare Workers](https://developers.cloudflare.com/workers/) - For hosting and deployment
 
 ## Development
 
 | Command           | Action                                       |
 | :---------------- | :------------------------------------------- |
-| `npm install`     | Installs dependencies                        |
-| `npm run dev`     | Starts local dev server at `localhost:4321`  |
-| `npm run build`   | Build the production site to `./dist/`       |
-| `npm run preview` | Preview your build locally, before deploying |
-| `npm run deploy`  | Deploy to Cloudflare Pages                   |
+| `pnpm install`    | Installs dependencies                        |
+| `pnpm dev`        | Starts local dev server at `localhost:4321`  |
+| `pnpm build`      | Type-check and build the production Worker   |
+| `pnpm preview`    | Preview the Worker locally with workerd      |
+| `pnpm deploy`     | Deploy to Cloudflare Workers                 |
+
+## Auth Preview Configuration
+
+Workers preview URLs do not provide `CF_PAGES_URL`. Configure preview auth explicitly when needed:
+
+- `AUTH_PREVIEW_URL`: the current preview origin used by Better Auth's OAuth proxy; leave empty for dynamic Workers preview hosts
+- `AUTH_TRUSTED_ORIGINS`: comma-separated extra allowed origins, including `https://pageturn.moverperfect.com`
+- `WORKERS_PREVIEW_HOST_SUFFIX`: workers.dev host suffix for branch previews, such as `-pageturn.moverperfect.workers.dev`
 
 ## Database Management
 
 | Command                      | Action                                         |
 | :--------------------------- | :--------------------------------------------- |
-| `npm run db:generate`        | Generate database migration files              |
-| `npm run db:migrate:local`   | Apply migrations to local development database |
-| `npm run db:migrate:prod`    | Apply migrations to production database        |
-| `npm run db:migrate:preview` | Apply migrations to preview environment        |
-| `npm run db:studio:local`    | Open Drizzle Studio for local database         |
-| `npm run db:studio:preview`  | Open Drizzle Studio for preview database       |
-| `npm run db:studio:prod`     | Open Drizzle Studio for production database    |
+| `pnpm db:generate`           | Generate database migration files              |
+| `pnpm db:migrate:local`      | Apply migrations to local development database |
+| `pnpm db:migrate:prod`       | Apply migrations to production database        |
+| `pnpm db:migrate:preview`    | Apply migrations to preview environment        |
+| `pnpm db:studio:local`       | Open Drizzle Studio for local database         |
+| `pnpm db:studio:preview`     | Open Drizzle Studio for preview database       |
+| `pnpm db:studio:prod`        | Open Drizzle Studio for production database    |
 
 ## License
 

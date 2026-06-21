@@ -1,3 +1,4 @@
+import { env } from 'cloudflare:workers';
 import { getAuth } from "./lib/auth";
 import { jsonResponse } from "./lib/api-auth";
 import { defineMiddleware } from "astro:middleware";
@@ -5,7 +6,7 @@ import { defineMiddleware } from "astro:middleware";
 export const onRequest = defineMiddleware(async (context, next) => {
   let isAuthed;
   try {
-    isAuthed = await getAuth(context.locals.runtime.env).api
+    isAuthed = await getAuth(env).api
       .getSession({
         headers: context.request.headers,
       });
