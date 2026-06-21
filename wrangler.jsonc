@@ -19,7 +19,7 @@
     "BETTER_AUTH_URL": "https://pageturn.moverperfect.com",
     // Dynamic Workers previews use the request URL as the OAuth proxy current URL.
     "AUTH_PREVIEW_URL": "",
-    "AUTH_TRUSTED_ORIGINS": "https://pageturn.moverperfect.com",
+    "AUTH_TRUSTED_ORIGINS": "https://pageturn.moverperfect.com,https://*.moverperfect.workers.dev",
     "WORKERS_PREVIEW_HOST_SUFFIX": "-pageturn.moverperfect.workers.dev"
   },
 
@@ -41,7 +41,7 @@
       "database_name": "page-turn",
       "database_id": "45ee565a-8c44-40c6-b85e-fa914a0ec67e"
     }
-  ]
+  ],
 
   /**
    * Service Bindings (communicate between multiple Workers)

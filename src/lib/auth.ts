@@ -33,6 +33,57 @@ function parseTrustedOrigin(origin: string) {
   }
 }
 
+function matchesOriginPattern(origin: string, pattern: string) {
+  try {
+    const originUrl = new URL(origin);
+    const patternUrl = new URL(pattern);
+
+    if (originUrl.protocol !== patternUrl.protocol) {
+      return false;
+    }
+
+    if (originUrl.port !== patternUrl.port) {
+      return false;
+    }
+
+    const originHost = originUrl.hostname.toLowerCase();
+    const patternHost = patternUrl.hostname.toLowerCase();
+
+    if (patternHost.startsWith("*.")) {
+      const suffix = patternHost.slice(2);
+      return originHost !== suffix && originHost.endsWith(`.${suffix}`);
+    }
+
+    return originUrl.origin === patternUrl.origin;
+  } catch {
+    return false;
+  }
+}
+
+export function isTrustedAuthOrigin(env: Env, origin: string | null) {
+  if (!origin) {
+    return false;
+  }
+
+  try {
+    const baseUrlHost = new URL(env.BETTER_AUTH_URL).hostname;
+    const originHost = new URL(origin).hostname;
+    const isCustomDomain =
+      originHost === baseUrlHost || originHost.endsWith(`.${baseUrlHost}`);
+    const isWorkersPreview = hostMatchesSuffix(
+      originHost,
+      env.WORKERS_PREVIEW_HOST_SUFFIX
+    );
+    const isConfiguredTrustedOrigin = splitOrigins(env.AUTH_TRUSTED_ORIGINS).some(
+      (pattern) => matchesOriginPattern(origin, pattern)
+    );
+
+    return isCustomDomain || isWorkersPreview || isConfiguredTrustedOrigin;
+  } catch {
+    return false;
+  }
+}
+
 // Static auth config for CLI generation
 // The CLI only needs the configuration, not an actual initialized instance
 export const auth = betterAuth({
@@ -91,27 +142,12 @@ export function getAuth(env: Env) {
       trustedOrigins: (request) => {
         const origins = [env.BETTER_AUTH_URL];
         const requestOrigin = request.headers.get("Origin");
-        if (requestOrigin) {
-          try {
-            const originHost = new URL(requestOrigin).hostname;
-            // Allow same origin and subdomains (e.g. pr-123.pageturn.moverperfect.com)
-            const isCustomDomain =
-              originHost === baseUrlHost ||
-              originHost.endsWith(`.${baseUrlHost}`);
-            const isWorkersPreview = hostMatchesSuffix(
-              originHost,
-              env.WORKERS_PREVIEW_HOST_SUFFIX
-            );
-            if (isCustomDomain || isWorkersPreview) {
-              origins.push(requestOrigin);
-            }
-          } catch {
-            // Invalid Origin header, ignore
-          }
+        if (isTrustedAuthOrigin(env, requestOrigin)) {
+          origins.push(requestOrigin!);
         }
         for (const origin of splitOrigins(env.AUTH_TRUSTED_ORIGINS)) {
           const trustedOrigin = parseTrustedOrigin(origin);
-          if (trustedOrigin) {
+          if (trustedOrigin && !trustedOrigin.includes("*")) {
             origins.push(trustedOrigin);
           }
         }
