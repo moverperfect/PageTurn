@@ -13,7 +13,7 @@ importers:
         version: 0.9.9(prettier@3.8.1)(typescript@5.9.3)
       '@astrojs/cloudflare':
         specifier: 13.1.10
-        version: 13.1.10(@types/node@22.20.0)(astro@6.4.6(@types/node@22.20.0)(jiti@2.6.1)(lightningcss@1.30.2)(rollup@4.62.2)(tsx@4.21.0)(yaml@2.8.3))(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(workerd@1.20260617.1)(wrangler@4.103.0)(yaml@2.8.3)
+        version: 13.1.10(@types/node@22.20.0)(astro@6.4.8(@types/node@22.20.0)(jiti@2.6.1)(lightningcss@1.30.2)(rollup@4.62.2)(tsx@4.21.0)(yaml@2.8.3))(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(workerd@1.20260617.1)(wrangler@4.103.0)(yaml@2.8.3)
       '@libsql/client':
         specifier: 0.15.15
         version: 0.15.15
@@ -24,8 +24,8 @@ importers:
         specifier: 10.0.0
         version: 10.0.0
       astro:
-        specifier: 6.4.6
-        version: 6.4.6(@types/node@22.20.0)(jiti@2.6.1)(lightningcss@1.30.2)(rollup@4.62.2)(tsx@4.21.0)(yaml@2.8.3)
+        specifier: 6.4.8
+        version: 6.4.8(@types/node@22.20.0)(jiti@2.6.1)(lightningcss@1.30.2)(rollup@4.62.2)(tsx@4.21.0)(yaml@2.8.3)
       better-auth:
         specifier: 1.3.34
         version: 1.3.34
@@ -1436,9 +1436,6 @@ packages:
   '@types/debug@4.1.12':
     resolution: {integrity: sha512-vIChWdVG3LG1SMxEvI/AK+FWJthlrqlTu7fbrlywTkkaONwk/UAGaULXRlf8vkzFBLVm0zkMdCquhL5aOjhXPQ==}
 
-  '@types/estree@1.0.7':
-    resolution: {integrity: sha512-w28IoSUCJpidD/TGviZwwMJckNESJZXFu7NBZ5YJ4mEUnNraUn9Pm8HSZm/jDF1pDWYKspWE7oVphigUPRakIQ==}
-
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
@@ -1545,8 +1542,8 @@ packages:
     resolution: {integrity: sha512-UOCGPYbl0tv8+006qks/dTgV9ajs97X2p0FAbyS2iyCRrmLSRolDaHdp+v/CLgnzHc3fVB+CwYiUmei7ndFcgA==}
     engines: {node: '>=12.0.0'}
 
-  astro@6.4.6:
-    resolution: {integrity: sha512-48OBTBKR9ctbf+DQxpOuxGl8ebfn59zTuNQMBzptmG/Mi/H8IdfMSbJgGuX1I/4U6g9yazG1p4BHlf4+2hWU4Q==}
+  astro@6.4.8:
+    resolution: {integrity: sha512-KK5lX90uU9EeVaTjINyj3sy9/NFXVa59aowaqbWBDDKLXZh4rr7GwIaCFYVetE22MJtsCNFerQXn0vlCLmpP/Q==}
     engines: {node: '>=22.12.0', npm: '>=9.6.5', pnpm: '>=7.1.0'}
     hasBin: true
 
@@ -2812,9 +2809,6 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  ufo@1.6.1:
-    resolution: {integrity: sha512-9a4/uxlTWJ4+a5i0ooc1rU7C7YOw3wT+UGqdeNNHWnOF9qcMBgLRS+4IYUqbczewFx4mLEig6gawh7X6mFlEkA==}
-
   ufo@1.6.4:
     resolution: {integrity: sha512-JFNbkD1Svwe0KvGi8GOeLcP4kAWQ609twvCdcHxq1oSL8svv39ZuSvajcD8B+5D0eL4+s1Is2D/O6KN3qcTeRA==}
 
@@ -2860,9 +2854,6 @@ packages:
 
   unist-util-visit-children@3.0.0:
     resolution: {integrity: sha512-RgmdTfSBOg04sdPcpTSD1jzoNBjt9a80/ZCzp5cI9n1qPzLZWF9YdvWGN2zmTumP1HWhXKdUWexjy/Wy/lJ7tA==}
-
-  unist-util-visit-parents@6.0.1:
-    resolution: {integrity: sha512-L/PqWzfTP9lzzEa6CKs0k2nARxTdZduw3zyh8d2NVBnsyvHjSX4TWse388YrrQKbvI8w20fGjGlhgT96WwKykw==}
 
   unist-util-visit-parents@6.0.2:
     resolution: {integrity: sha512-goh1s1TBrqSqukSc8wrjwWhL0hiJxgA8m4kFxGlQ+8FYQ3C/m11FcTs4YYem7V664AhHVvgoQLk890Ssdsr2IQ==}
@@ -3222,12 +3213,12 @@ snapshots:
       - prettier
       - prettier-plugin-astro
 
-  '@astrojs/cloudflare@13.1.10(@types/node@22.20.0)(astro@6.4.6(@types/node@22.20.0)(jiti@2.6.1)(lightningcss@1.30.2)(rollup@4.62.2)(tsx@4.21.0)(yaml@2.8.3))(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(workerd@1.20260617.1)(wrangler@4.103.0)(yaml@2.8.3)':
+  '@astrojs/cloudflare@13.1.10(@types/node@22.20.0)(astro@6.4.8(@types/node@22.20.0)(jiti@2.6.1)(lightningcss@1.30.2)(rollup@4.62.2)(tsx@4.21.0)(yaml@2.8.3))(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(workerd@1.20260617.1)(wrangler@4.103.0)(yaml@2.8.3)':
     dependencies:
       '@astrojs/internal-helpers': 0.8.0
       '@astrojs/underscore-redirects': 1.0.3
       '@cloudflare/vite-plugin': 1.42.1(vite@7.3.5(@types/node@22.20.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.3))(workerd@1.20260617.1)(wrangler@4.103.0)
-      astro: 6.4.6(@types/node@22.20.0)(jiti@2.6.1)(lightningcss@1.30.2)(rollup@4.62.2)(tsx@4.21.0)(yaml@2.8.3)
+      astro: 6.4.8(@types/node@22.20.0)(jiti@2.6.1)(lightningcss@1.30.2)(rollup@4.62.2)(tsx@4.21.0)(yaml@2.8.3)
       piccolore: 0.1.3
       tinyglobby: 0.2.15
       vite: 7.3.5(@types/node@22.20.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.3)
@@ -4049,7 +4040,7 @@ snapshots:
 
   '@rollup/pluginutils@5.3.0(rollup@4.62.2)':
     dependencies:
-      '@types/estree': 1.0.7
+      '@types/estree': 1.0.9
       estree-walker: 2.0.2
       picomatch: 4.0.4
     optionalDependencies:
@@ -4270,8 +4261,6 @@ snapshots:
     dependencies:
       '@types/ms': 2.1.0
 
-  '@types/estree@1.0.7': {}
-
   '@types/estree@1.0.9': {}
 
   '@types/hast@3.0.4':
@@ -4392,7 +4381,7 @@ snapshots:
       pvutils: 1.1.3
       tslib: 2.8.1
 
-  astro@6.4.6(@types/node@22.20.0)(jiti@2.6.1)(lightningcss@1.30.2)(rollup@4.62.2)(tsx@4.21.0)(yaml@2.8.3):
+  astro@6.4.8(@types/node@22.20.0)(jiti@2.6.1)(lightningcss@1.30.2)(rollup@4.62.2)(tsx@4.21.0)(yaml@2.8.3):
     dependencies:
       '@astrojs/compiler': 4.0.0
       '@astrojs/internal-helpers': 0.10.0
@@ -4438,7 +4427,7 @@ snapshots:
       svgo: 4.0.1
       tinyclip: 0.1.14
       tinyexec: 1.2.4
-      tinyglobby: 0.2.15
+      tinyglobby: 0.2.17
       ultrahtml: 1.6.0
       unifont: 0.7.4
       unist-util-visit: 5.1.0
@@ -5527,7 +5516,7 @@ snapshots:
     dependencies:
       destr: 2.0.5
       node-fetch-native: 1.6.7
-      ufo: 1.6.1
+      ufo: 1.6.4
 
   ohash@2.0.11: {}
 
@@ -5995,8 +5984,6 @@ snapshots:
 
   typescript@5.9.3: {}
 
-  ufo@1.6.1: {}
-
   ufo@1.6.4: {}
 
   ultrahtml@1.6.0: {}
@@ -6058,11 +6045,6 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
 
-  unist-util-visit-parents@6.0.1:
-    dependencies:
-      '@types/unist': 3.0.3
-      unist-util-is: 6.0.0
-
   unist-util-visit-parents@6.0.2:
     dependencies:
       '@types/unist': 3.0.3
@@ -6072,7 +6054,7 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
       unist-util-is: 6.0.0
-      unist-util-visit-parents: 6.0.1
+      unist-util-visit-parents: 6.0.2
 
   unstorage@1.17.5:
     dependencies:
