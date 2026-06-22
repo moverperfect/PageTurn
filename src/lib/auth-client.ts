@@ -2,15 +2,12 @@ import { createAuthClient } from 'better-auth/client';
 import { oneTapClient } from 'better-auth/client/plugins';
 import { adminClient } from 'better-auth/client/plugins';
 
-// Initialize authClient with proper plugins
-// When authBaseUrl is provided (e.g. on preview deployments), the client sends all auth
-// requests to that URL to fix state_mismatch - the OAuth state cookie must be on the same
-// domain as the callback URL.
-export function initAuthClient(googleClientId?: string, authBaseUrl?: string) {
-  const baseOptions = authBaseUrl ? { baseURL: authBaseUrl } : {};
+// Initialize authClient with proper plugins.
+// Auth requests intentionally stay same-origin so preview deployments can use
+// Better Auth's OAuth proxy without splitting OAuth state across domains.
+export function initAuthClient(googleClientId?: string) {
   if (googleClientId) {
     return createAuthClient({
-      ...baseOptions,
       plugins: [
         oneTapClient({
           clientId: googleClientId,
@@ -20,7 +17,6 @@ export function initAuthClient(googleClientId?: string, authBaseUrl?: string) {
     });
   } else {
     return createAuthClient({
-      ...baseOptions,
       plugins: [
         adminClient()
       ]

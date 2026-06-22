@@ -18,13 +18,8 @@ const isImpersonating = !!session?.Session?.impersonatedBy;
 let isAdmin = Astro.locals.session?.User?.role === 'admin';
 
 let googleClientId;
-let authBaseUrl;
 if (!isLoggedIn) {
   googleClientId = env.GOOGLE_CLIENT_ID;
-  // On preview deployments, use production auth URL to fix OAuth state_mismatch.
-  if (Astro.url.origin !== env.BETTER_AUTH_URL) {
-    authBaseUrl = env.BETTER_AUTH_URL;
-  }
 }
 ---
 
@@ -263,7 +258,6 @@ if (!isLoggedIn) {
         <>
           {/* prettier-ignore */}
           <div id="client-id" class="hidden">{googleClientId}</div>
-          <div id="auth-base-url" class="hidden">{authBaseUrl ?? ''}</div>
         </>
       ) : (
         ''
@@ -309,11 +303,8 @@ if (!isLoggedIn) {
 
         const rawId = document.getElementById('client-id')?.textContent?.trim();
         const googleClientId = rawId ? rawId : undefined;
-        const authBaseUrl = document.getElementById('auth-base-url')?.textContent?.trim();
-        const authBaseUrlOrUndefined = authBaseUrl ? authBaseUrl : undefined;
-
         // Initialize auth client with proper plugins
-        window.PageTurnAuthClient = initAuthClient(googleClientId, authBaseUrlOrUndefined);
+        window.PageTurnAuthClient = initAuthClient(googleClientId);
 
         // Setup logout functionality
         const logoutBtn = document.getElementById('logout-btn');

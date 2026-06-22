@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { getAuth, isTrustedAuthOrigin } from "../../../lib/auth";
+import { getAuth, getOAuthProxyBaseURL, isTrustedAuthOrigin } from "../../../lib/auth";
 import type { APIRoute } from "astro";
 
 function getCorsHeaders(request: Request, env: Env) {
@@ -47,7 +47,8 @@ export const ALL: APIRoute = async (ctx) => {
     });
   }
 
-  const auth = getAuth(env);
+  const proxyBaseURL = await getOAuthProxyBaseURL(env, ctx.request);
+  const auth = getAuth(env, ctx.request, proxyBaseURL);
   try {
     return withCorsHeaders(await auth.handler(ctx.request), corsHeaders);
   } catch (error) {
