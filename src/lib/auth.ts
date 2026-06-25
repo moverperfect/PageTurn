@@ -5,9 +5,6 @@ import { getDbClient } from "./db-client";
 import { verification } from "./schema";
 import { admin, oAuthProxy, oneTap } from "better-auth/plugins";
 
-// Singleton auth client
-const authInstances = new Map<string, ReturnType<typeof betterAuth>>();
-
 function splitOrigins(origins?: string) {
   return origins
     ?.split(",")
@@ -273,6 +270,68 @@ export const auth = betterAuth({
   ]
 });
 
+function createRuntimeAuth(env: Env, baseURL: string, cookieDomain?: string) {
+  return betterAuth({
+    secret: env.OAUTH_PROXY_SECRET || env.BETTER_AUTH_SECRET,
+    baseURL,
+    trustedOrigins: (request) => {
+      const origins = [env.BETTER_AUTH_URL];
+      const requestOrigin = request?.headers.get("Origin") ?? null;
+      if (requestOrigin && isTrustedAuthOrigin(env, requestOrigin)) {
+        origins.push(requestOrigin);
+      }
+      for (const origin of splitOrigins(env.AUTH_TRUSTED_ORIGINS)) {
+        const trustedOrigin = parseTrustedOrigin(origin);
+        if (trustedOrigin && !trustedOrigin.includes("*")) {
+          origins.push(trustedOrigin);
+        }
+      }
+      return origins;
+    },
+    ...(cookieDomain
+      ? {
+        advanced: {
+          crossSubDomainCookies: {
+            enabled: true,
+            domain: cookieDomain,
+          },
+        },
+      }
+      : {}),
+    database: drizzleAdapter(getDbClient(env), {
+      provider: "sqlite",
+    }),
+    socialProviders: {
+      github: {
+        clientId: env.GITHUB_CLIENT_ID,
+        clientSecret: env.GITHUB_CLIENT_SECRET,
+        redirectURI: `${env.BETTER_AUTH_URL}/api/auth/callback/github`
+      },
+      google: {
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
+        redirectURI: `${env.BETTER_AUTH_URL}/api/auth/callback/google`
+      }
+    },
+    plugins: [
+      oAuthProxy({
+        productionURL: env.BETTER_AUTH_URL,
+      }),
+      oneTap(),
+      admin({
+        adminRoles: ["admin"],
+        defaultRole: "user",
+        impersonationSessionDuration: 60 * 60,
+        defaultBanReason: "Banned by administrator",
+        bannedUserMessage: "Your account has been suspended. Please contact support if you believe this is an error."
+      })
+    ]
+  });
+}
+
+// Singleton auth client
+const authInstances = new Map<string, ReturnType<typeof createRuntimeAuth>>();
+
 /**
  * Returns a singleton authentication client configured with OAuth providers and plugins based on the given environment.
  *
@@ -304,62 +363,7 @@ export function getAuth(env: Env, request?: Request, baseURLOverride?: string | 
         ? undefined
         : `.${baseUrlHost}`;
 
-    authInstances.set(instanceKey, betterAuth({
-      secret: env.OAUTH_PROXY_SECRET || env.BETTER_AUTH_SECRET,
-      baseURL,
-      trustedOrigins: (request) => {
-        const origins = [env.BETTER_AUTH_URL];
-        const requestOrigin = request.headers.get("Origin");
-        if (isTrustedAuthOrigin(env, requestOrigin)) {
-          origins.push(requestOrigin!);
-        }
-        for (const origin of splitOrigins(env.AUTH_TRUSTED_ORIGINS)) {
-          const trustedOrigin = parseTrustedOrigin(origin);
-          if (trustedOrigin && !trustedOrigin.includes("*")) {
-            origins.push(trustedOrigin);
-          }
-        }
-        return origins;
-      },
-      ...(cookieDomain
-        ? {
-          advanced: {
-            crossSubDomainCookies: {
-              enabled: true,
-              domain: cookieDomain,
-            },
-          },
-        }
-        : {}),
-      database: drizzleAdapter(getDbClient(env), {
-        provider: "sqlite",
-      }),
-      socialProviders: {
-        github: {
-          clientId: env.GITHUB_CLIENT_ID,
-          clientSecret: env.GITHUB_CLIENT_SECRET,
-          redirectURI: `${env.BETTER_AUTH_URL}/api/auth/callback/github`
-        },
-        google: {
-          clientId: env.GOOGLE_CLIENT_ID,
-          clientSecret: env.GOOGLE_CLIENT_SECRET,
-          redirectURI: `${env.BETTER_AUTH_URL}/api/auth/callback/google`
-        }
-      },
-      plugins: [
-        oAuthProxy({
-          productionURL: env.BETTER_AUTH_URL,
-        }),
-        oneTap(),
-        admin({
-          adminRoles: ["admin"],
-          defaultRole: "user",
-          impersonationSessionDuration: 60 * 60,
-          defaultBanReason: "Banned by administrator",
-          bannedUserMessage: "Your account has been suspended. Please contact support if you believe this is an error."
-        })
-      ]
-    }));
+    authInstances.set(instanceKey, createRuntimeAuth(env, baseURL, cookieDomain));
   }
   return authInstances.get(instanceKey)!;
 }

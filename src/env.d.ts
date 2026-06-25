@@ -7,7 +7,10 @@ type BaseUser = import("better-auth").User;
 
 // Extend the User type to include additional fields
 interface User extends BaseUser {
-  role?: string;
+  role?: string | null;
+  banned?: boolean | null;
+  banReason?: string | null;
+  banExpires?: Date | null;
 }
 
 declare namespace App {
