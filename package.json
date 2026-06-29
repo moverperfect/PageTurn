@@ -23,7 +23,7 @@
     "@astrojs/check": "0.9.9",
     "@astrojs/cloudflare": "13.7.0",
     "@libsql/client": "0.15.15",
-    "@tailwindcss/vite": "4.1.18",
+    "@tailwindcss/vite": "4.3.2",
     "@types/uuid": "11.0.0",
     "astro": "6.4.8",
     "better-auth": "1.6.22",
@@ -36,7 +36,7 @@
     "better-sqlite3": "12.11.1",
     "cross-env": "10.1.0",
     "drizzle-kit": "0.31.10",
-    "tailwindcss": "4.1.18",
+    "tailwindcss": "4.3.2",
     "ts-node": "10.9.2",
     "typescript": "5.9.3",
     "wrangler": "4.105.0"
