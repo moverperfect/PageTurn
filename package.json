@@ -25,7 +25,7 @@
     "@libsql/client": "0.17.4",
     "@tailwindcss/vite": "4.3.3",
     "@types/uuid": "11.0.0",
-    "astro": "7.0.9",
+    "astro": "7.1.0",
     "better-auth": "1.6.23",
     "drizzle-orm": "0.45.2",
     "uuid": "14.0.1"
