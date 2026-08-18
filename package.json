@@ -28,7 +28,7 @@
     "astro": "7.0.9",
     "better-auth": "1.6.30",
     "drizzle-orm": "0.45.2",
-    "uuid": "14.0.1"
+    "uuid": "14.0.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "7.6.13",
