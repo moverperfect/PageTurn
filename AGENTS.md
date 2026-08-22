@@ -87,6 +87,7 @@ migrations/           # Drizzle migrations
 | `pnpm run dev` | Local dev at `localhost:4321` |
 | `pnpm run build` | Build for production |
 | `pnpm run preview` | Build and preview with Wrangler Pages locally |
+| `pnpm run test:acceptance` | Build, then run the acceptance suite against the built Worker on an isolated D1 (see `docs/acceptance-testing.md`) |
 | `pnpm run deploy` | Build and deploy to Cloudflare Pages |
 | `pnpm run cf-typegen` | Regenerate Cloudflare binding/runtime types |
 | `pnpm run db:generate` | Generate Drizzle migrations |

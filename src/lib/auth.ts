@@ -274,6 +274,15 @@ function createRuntimeAuth(env: Env, baseURL: string, cookieDomain?: string) {
   return betterAuth({
     secret: env.OAUTH_PROXY_SECRET || env.BETTER_AUTH_SECRET,
     baseURL,
+    // Credential sign-in exists solely so the acceptance suite can authenticate
+    // fixtures without an external OAuth provider. ACCEPTANCE_TEST_AUTH is never
+    // set in deployed configuration, so these endpoints stay disabled in
+    // production and previews.
+    // The cast keeps this comparison valid even when `wrangler types` narrows
+    // the var to its literal default of "".
+    emailAndPassword: {
+      enabled: (env.ACCEPTANCE_TEST_AUTH as string | undefined) === "true",
+    },
     trustedOrigins: (request) => {
       const origins = [env.BETTER_AUTH_URL];
       const requestOrigin = request?.headers.get("Origin") ?? null;

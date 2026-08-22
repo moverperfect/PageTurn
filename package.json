@@ -11,6 +11,7 @@
     "dev": "astro dev",
     "build": "astro check && astro build",
     "preview": "astro build && astro preview",
+    "test:acceptance": "node scripts/acceptance.mjs",
     "astro": "astro",
     "deploy": "astro build && wrangler deploy",
     "cf-typegen": "wrangler types",
@@ -39,6 +40,7 @@
     "tailwindcss": "4.3.3",
     "ts-node": "10.9.2",
     "typescript": "5.9.3",
+    "vitest": "4.1.11",
     "wrangler": "4.111.0"
   }
 }
