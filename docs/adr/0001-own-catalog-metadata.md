@@ -1,0 +1,3 @@
+# Own normalized catalog metadata
+
+PageTurn stores Works, Editions, Edition Contents, Contributors, and Contributions in its own catalog and treats external metadata as suggestions rather than authoritative records. An Edition may contain multiple Works, while Library Entries reference Editions. Open Library is the initial provider behind a provider-neutral adapter; imported metadata is cached locally and retains its source identifier for attribution and refreshes. Readers may create sparse missing records—a Work needs a title, while an Edition needs its Work association, format, and Progress Unit—and enrich them later. Trusted imports or administrators govern changes to shared records and merge duplicates into canonical records without breaking existing references.
