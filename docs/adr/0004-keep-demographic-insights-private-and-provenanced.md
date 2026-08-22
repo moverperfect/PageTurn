@@ -1,0 +1,3 @@
+# Keep demographic insights private and provenanced
+
+PageTurn offers private Demographic Insights using Contributor Gender with provenance retained when known, Unknown kept visible, and Gender never inferred from names. Library Composition measures unique Works in active Owned holdings, Reading Exposure measures tracked reading time, both default to Author Contributions, and multi-author Works count fully in every represented Gender category through overlapping Representation Rates. Only trusted imports or administrators may change shared Gender data; Readers explicitly choose whether to share an aggregate insight, never its underlying Library or Reading Sessions.

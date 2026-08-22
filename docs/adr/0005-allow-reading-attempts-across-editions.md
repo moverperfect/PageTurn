@@ -1,0 +1,3 @@
+# Allow Reading Attempts across Editions
+
+A Reading Attempt represents one intentional effort by a Reader to read a Work and may span multiple Editions, such as alternating between paperback and audiobook. Each Reading Session identifies its Edition and retains positions in that Edition's native Progress Unit; incompatible positions are never summed. PageTurn automatically advances Work Progress from a consistent Edition, suggests confirmation when Editions change or materially disagree, always permits manual correction, and never reduces progress merely because earlier material was revisited. A Reader may have only one unfinished attempt for a Work at a time.
