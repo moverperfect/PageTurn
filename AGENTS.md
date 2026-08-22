@@ -102,3 +102,17 @@ migrations/           # Drizzle migrations
 - When adding new DB queries, add them to `src/lib/db.ts` and keep API routes thin.
 - API routes follow REST-style patterns; use appropriate HTTP methods (GET, POST, PUT, PATCH, DELETE).
 - Avoid hardcoding secrets; use environment variables / wrangler secrets.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are tracked in GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The canonical triage labels use their default names. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This repository uses a single-context domain layout. See `docs/agents/domain.md`.
