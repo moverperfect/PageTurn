@@ -194,7 +194,7 @@ try {
   await waitForReady(`${baseURL}/login`, 90_000);
   console.log("[acceptance] Worker is ready, running acceptance suite");
 
-  await run("pnpm", ["exec", "vitest", "run"], {
+  await run("pnpm", ["exec", "vitest", "run", "--project", "acceptance"], {
     env: {
       ...process.env,
       ACCEPTANCE_BASE_URL: baseURL,

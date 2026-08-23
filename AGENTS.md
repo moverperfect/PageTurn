@@ -88,6 +88,7 @@ migrations/           # Drizzle migrations
 | `pnpm run build` | Build for production |
 | `pnpm run preview` | Build and preview with Wrangler Pages locally |
 | `pnpm run test:acceptance` | Build, then run the acceptance suite against the built Worker on an isolated D1 (see `docs/acceptance-testing.md`) |
+| `pnpm run test:migrations` | Fast schema checks: apply `migrations/` to a scratch SQLite database and verify deletion semantics |
 | `pnpm run deploy` | Build and deploy to Cloudflare Pages |
 | `pnpm run cf-typegen` | Regenerate Cloudflare binding/runtime types |
 | `pnpm run db:generate` | Generate Drizzle migrations |

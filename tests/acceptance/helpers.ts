@@ -147,19 +147,11 @@ export function deleteFixtures(fixtures: Fixture[]): void {
   }
   const db = openDatabase();
   try {
-    // The deployed schema's user_id foreign keys predate ON DELETE CASCADE,
-    // so dependent rows are removed explicitly, leaves first.
-    const statements = [
-      'DELETE FROM reading_sessions WHERE user_id IN (SELECT id FROM user WHERE email = ?)',
-      'DELETE FROM books WHERE user_id IN (SELECT id FROM user WHERE email = ?)',
-      'DELETE FROM session WHERE user_id IN (SELECT id FROM user WHERE email = ?)',
-      'DELETE FROM account WHERE user_id IN (SELECT id FROM user WHERE email = ?)',
-      'DELETE FROM user WHERE email = ?',
-    ].map((sql) => db.prepare(sql));
+    // Every user_id foreign key carries ON DELETE CASCADE (since migration
+    // 0006), so deleting the user removes the dependent rows too.
+    const statement = db.prepare('DELETE FROM user WHERE email = ?');
     for (const fixture of fixtures) {
-      for (const statement of statements) {
-        statement.run(fixture.email);
-      }
+      statement.run(fixture.email);
     }
   } finally {
     db.close();

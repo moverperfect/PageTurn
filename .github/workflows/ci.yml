@@ -22,5 +22,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Run migration tests
+        run: pnpm run test:migrations
+
       - name: Build and run acceptance suite
         run: pnpm run test:acceptance
