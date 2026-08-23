@@ -88,11 +88,17 @@ async function stopServer(child) {
   }
   const exited = new Promise((resolve) => child.once("exit", resolve));
   signalServerGroup(child, "SIGTERM");
-  const timeout = new Promise((resolve) => setTimeout(resolve, 10_000, "timeout"));
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(resolve, 10_000, "timeout");
+  });
   if ((await Promise.race([exited, timeout])) === "timeout") {
     signalServerGroup(child, "SIGKILL");
     await exited;
   }
+  // The losing timer would otherwise keep the event loop (and CI job) alive
+  // for the rest of the 10 seconds.
+  clearTimeout(timer);
 }
 
 const skipBuild = process.env.ACCEPTANCE_SKIP_BUILD === "1";
