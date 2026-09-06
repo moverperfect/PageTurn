@@ -151,6 +151,45 @@ describe('sparse Works', () => {
     expect(html).not.toContain(otherTitle);
   });
 
+  it('matches a title substring without treating LIKE wildcards as patterns', async () => {
+    const token = `Inner${crypto.randomUUID().replaceAll('-', '')}`;
+    const substringTitle = `Prefix ${token} Suffix`;
+    const createdSubstring = await request('/api/works', {
+      method: 'POST',
+      cookie: reader.cookie,
+      body: { title: substringTitle },
+    });
+    expect(createdSubstring.status).toBe(201);
+    const work = (await createdSubstring.json()) as WorkResource;
+
+    const substringSearch = await request(
+      `/api/works?q=${encodeURIComponent(token.toLowerCase())}`,
+      { cookie: otherReader.cookie }
+    );
+    expect(substringSearch.status).toBe(200);
+    const substringFound = (await substringSearch.json()) as WorkListResponse;
+    expect(substringFound.works.map((item) => item.id)).toContain(work.id);
+
+    const percentTitle = `Percent ${crypto.randomUUID()} 100%`;
+    const createdPercent = await request('/api/works', {
+      method: 'POST',
+      cookie: reader.cookie,
+      body: { title: percentTitle },
+    });
+    expect(createdPercent.status).toBe(201);
+    const percentWork = (await createdPercent.json()) as WorkResource;
+
+    const wildcardSearch = await request(
+      `/api/works?q=${encodeURIComponent('%')}`,
+      { cookie: otherReader.cookie }
+    );
+    expect(wildcardSearch.status).toBe(200);
+    const wildcardFound = (await wildcardSearch.json()) as WorkListResponse;
+    expect(wildcardFound.works.map((item) => item.id)).toContain(percentWork.id);
+    expect(wildcardFound.works.map((item) => item.id)).not.toContain(work.id);
+    expect(wildcardFound.works.map((item) => item.id)).not.toContain(created.id);
+  });
+
   it('finds Works whose titles use non-ASCII letters regardless of query case', async () => {
     const unicodeTitle = `Éclair ${crypto.randomUUID()}`;
     const createdUnicode = await request('/api/works', {
@@ -168,6 +207,26 @@ describe('sparse Works', () => {
     expect(search.status).toBe(200);
     const found = (await search.json()) as WorkListResponse;
     expect(found.works.map((item) => item.id)).toContain(work.id);
+  });
+
+  it('returns at most 50 Works for an empty catalog query', async () => {
+    const prefix = `Bound ${crypto.randomUUID()}`;
+    const createdBatch = await Promise.all(
+      Array.from({ length: 51 }, (_, index) =>
+        request('/api/works', {
+          method: 'POST',
+          cookie: reader.cookie,
+          body: { title: `${prefix} ${String(index).padStart(2, '0')}` },
+        })
+      )
+    );
+    expect(createdBatch.every((response) => response.status === 201)).toBe(true);
+
+    const list = await request('/api/works', { cookie: reader.cookie });
+    expect(list.status).toBe(200);
+    const found = (await list.json()) as WorkListResponse;
+    expect(found.works).toHaveLength(50);
+    expect(found).toEqual({ works: found.works });
   });
 
   it('creates a Work from the catalog form without requiring other facts', async () => {

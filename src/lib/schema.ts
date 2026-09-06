@@ -3,9 +3,11 @@ import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core
 export const works = sqliteTable('works', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
+  titleSearch: text('title_search').notNull(),
   firstPublicationDate: text('first_publication_date'),
 }, (table) => [
   index('works_title_idx').on(table.title),
+  index('works_title_search_idx').on(table.titleSearch),
 ]);
 
 export const books = sqliteTable('books', {

@@ -4,17 +4,27 @@ import { getDbClient } from './db-client';
 import { books, readingSessions, works, type Book, type ReadingSession, type Work } from './schema';
 import { v4 as uuidv4 } from 'uuid';
 
+const WORK_SEARCH_LIMIT = 50;
+
 function foldSearchText(value: string): string {
   return value.normalize('NFC').toLowerCase();
 }
 
+function likeContainsPattern(value: string): string {
+  return `%${value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`;
+}
+
 /**
  * Inserts a Work and returns the persisted record with a generated ID.
+ *
+ * Persists `titleSearch` as the NFC-normalized, lowercased title so catalog
+ * search can filter in D1 without loading the full table.
  */
-export async function insertWork(workData: Omit<Work, 'id'>, env: Env): Promise<Work> {
+export async function insertWork(workData: Omit<Work, 'id' | 'titleSearch'>, env: Env): Promise<Work> {
   const newWork: Work = {
     ...workData,
     id: uuidv4(),
+    titleSearch: foldSearchText(workData.title),
   };
 
   try {
@@ -44,19 +54,28 @@ export async function getWorkById(id: string, env: Env): Promise<Work | undefine
 /**
  * Searches locally stored Works by title substring.
  *
- * Matching lowercases and NFC-normalizes both the query and stored titles in
- * JavaScript so non-ASCII letters such as É fold the same way on both sides.
- * An empty query returns every Work, ordered by title.
+ * Matching uses the persisted NFC-lowercase `titleSearch` key so D1 can filter
+ * without SQLite `lower()` or loading the full catalog into the Worker. An
+ * empty query returns a title-ordered page rather than every row.
  */
 export async function searchWorks(query: string, env: Env): Promise<Work[]> {
   try {
     const db = getDbClient(env);
-    const rows = await db.select().from(works).orderBy(asc(works.title));
     const needle = foldSearchText(query.trim());
     if (!needle) {
-      return rows;
+      return await db
+        .select()
+        .from(works)
+        .orderBy(asc(works.title))
+        .limit(WORK_SEARCH_LIMIT);
     }
-    return rows.filter((work) => foldSearchText(work.title).includes(needle));
+
+    return await db
+      .select()
+      .from(works)
+      .where(sql`${works.titleSearch} LIKE ${likeContainsPattern(needle)} ESCAPE '\\'`)
+      .orderBy(asc(works.title))
+      .limit(WORK_SEARCH_LIMIT);
   } catch (error) {
     console.error('Error searching works:', error);
     throw new Error(`Failed to search works: ${error instanceof Error ? error.message : 'Unknown error'}`);
