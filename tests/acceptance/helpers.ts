@@ -27,6 +27,8 @@ export interface RequestOptions {
   method?: string;
   cookie?: string;
   body?: unknown;
+  /** When set, sent as application/x-www-form-urlencoded instead of JSON. */
+  form?: URLSearchParams;
 }
 
 /**
@@ -41,13 +43,18 @@ export async function request(
   if (options.cookie) {
     headers.Cookie = options.cookie;
   }
-  if (options.body !== undefined) {
+  let body: string | undefined;
+  if (options.form) {
+    headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    body = options.form.toString();
+  } else if (options.body !== undefined) {
     headers['Content-Type'] = 'application/json';
+    body = JSON.stringify(options.body);
   }
   return fetch(`${baseURL}${pathname}`, {
     method: options.method ?? 'GET',
     headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body,
     redirect: 'manual',
   });
 }

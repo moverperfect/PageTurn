@@ -1,0 +1,93 @@
+---
+import { env } from 'cloudflare:workers';
+import Layout from '../../layouts/Layout.astro';
+import { CatalogValidationError, createWork } from '../../lib/catalog';
+
+let errorMessage = '';
+let formData = {
+  title: '',
+  firstPublicationDate: '',
+};
+
+if (Astro.request.method === 'POST') {
+  try {
+    const data = await Astro.request.formData();
+    formData = {
+      title: (data.get('title') as string) || '',
+      firstPublicationDate: (data.get('firstPublicationDate') as string) || '',
+    };
+
+    const { id } = await createWork(
+      {
+        title: formData.title,
+        firstPublicationDate: formData.firstPublicationDate,
+      },
+      env
+    );
+    return Astro.redirect(`/works/${id}`);
+  } catch (error) {
+    if (error instanceof CatalogValidationError) {
+      errorMessage = error.message;
+    } else {
+      console.error('Error creating Work:', error);
+      errorMessage = 'Failed to create Work. Please try again.';
+    }
+  }
+}
+---
+
+<Layout title="Create Work | PageTurn">
+  <div>
+    <h1>Create Work</h1>
+    <p class="text-slate-300 mb-6 max-w-2xl">
+      A Work needs only a title. Optional catalog facts such as first
+      publication date stay unknown until they are known — PageTurn will not
+      invent them.
+    </p>
+
+    {
+      errorMessage && (
+        <div
+          class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
+          role="alert"
+        >
+          <p>{errorMessage}</p>
+        </div>
+      )
+    }
+
+    <form method="POST" class="max-w-xl mt-6 space-y-6">
+      <div>
+        <label for="title" class="form-label">Title</label>
+        <input
+          type="text"
+          id="title"
+          name="title"
+          required
+          class="form-input"
+          value={formData.title}
+        />
+      </div>
+
+      <div>
+        <label for="firstPublicationDate" class="form-label">
+          First publication date
+          <span class="text-slate-400 font-normal"> (optional)</span>
+        </label>
+        <input
+          type="date"
+          id="firstPublicationDate"
+          name="firstPublicationDate"
+          class="form-input"
+          value={formData.firstPublicationDate}
+        />
+        <p class="mt-2 text-sm text-slate-400">Leave blank if unknown.</p>
+      </div>
+
+      <div class="flex justify-end space-x-4 pt-4">
+        <a href="/works" class="btn-secondary">Cancel</a>
+        <button type="submit" class="btn">Create Work</button>
+      </div>
+    </form>
+  </div>
+</Layout>

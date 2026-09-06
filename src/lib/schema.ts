@@ -1,5 +1,13 @@
 import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
 
+export const works = sqliteTable('works', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  firstPublicationDate: text('first_publication_date'),
+}, (table) => [
+  index('works_title_idx').on(table.title),
+]);
+
 export const books = sqliteTable('books', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
@@ -105,6 +113,9 @@ export const verification = sqliteTable("verification", {
   index('verification_identifier_idx').on(table.identifier),
   index('verification_expires_at_idx').on(table.expiresAt),
 ]);
+
+export type Work = typeof works.$inferSelect;
+export type NewWork = typeof works.$inferInsert;
 
 // Types for our book and reading session data
 export type Book = typeof books.$inferSelect;

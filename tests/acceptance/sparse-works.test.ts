@@ -1,0 +1,175 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  deleteFixtures,
+  request,
+  signUpFixture,
+  type Fixture,
+} from './helpers';
+
+interface WorkResource {
+  id: string;
+  title: string;
+  firstPublicationDate: string | null;
+}
+
+interface WorkListResponse {
+  works: WorkResource[];
+}
+
+interface BookResponse {
+  id: string;
+  title: string;
+}
+
+describe('sparse Works', () => {
+  let reader: Fixture;
+  let otherReader: Fixture;
+  const title = `Obscure Tract ${crypto.randomUUID()}`;
+  const otherTitle = `Unrelated Work ${crypto.randomUUID()}`;
+  let created: WorkResource;
+
+  beforeAll(async () => {
+    reader = await signUpFixture('works-reader');
+    otherReader = await signUpFixture('works-other');
+  });
+
+  afterAll(() => {
+    deleteFixtures([reader, otherReader]);
+  });
+
+  it('rejects catalog mutation without a session', async () => {
+    const response = await request('/api/works', {
+      method: 'POST',
+      body: { title },
+    });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Unauthorized' });
+  });
+
+  it('redirects the catalog pages without a session', async () => {
+    for (const path of ['/works', '/works/new']) {
+      const response = await request(path);
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe('/login');
+    }
+  });
+
+  it('rejects a Work without a title', async () => {
+    const response = await request('/api/works', {
+      method: 'POST',
+      cookie: reader.cookie,
+      body: { title: '   ' },
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Title is required' });
+  });
+
+  it('lets an authenticated Reader create a Work from only a title', async () => {
+    const response = await request('/api/works', {
+      method: 'POST',
+      cookie: reader.cookie,
+      body: {
+        title,
+        author: 'Fabricated Author',
+        format: 'Paperback',
+        pageCount: 0,
+        publishedYear: 0,
+        genre: 'Unknown',
+      },
+    });
+    expect(response.status).toBe(201);
+    created = (await response.json()) as WorkResource;
+    expect(created.id).toBeTruthy();
+    expect(created.title).toBe(title);
+    expect(created.firstPublicationDate).toBeNull();
+    expect(created).toEqual({
+      id: created.id,
+      title,
+      firstPublicationDate: null,
+    });
+  });
+
+  it('does not create an Edition, Library Entry, Holding Period, or Reading Attempt', async () => {
+    const [library, sessions, detail] = await Promise.all([
+      request('/api/books', { cookie: reader.cookie }),
+      request('/api/reading-sessions', { cookie: reader.cookie }),
+      request(`/api/works/${created.id}`, { cookie: reader.cookie }),
+    ]);
+    expect(library.status).toBe(200);
+    const books = (await library.json()) as BookResponse[];
+    expect(books.map((book) => book.title)).not.toContain(title);
+
+    expect(sessions.status).toBe(200);
+    expect(await sessions.json()).toEqual([]);
+
+    expect(detail.status).toBe(200);
+    expect(await detail.json()).toEqual({
+      id: created.id,
+      title,
+      firstPublicationDate: null,
+    });
+  });
+
+  it('keeps unknown optional catalog facts unknown on the Work detail view', async () => {
+    const response = await request(`/works/${created.id}`, {
+      cookie: reader.cookie,
+    });
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(title);
+    expect(html).toMatch(
+      /data-field="first-publication-date"[^>]*>\s*Unknown\s*</
+    );
+    expect(html).toContain('This Work has no Editions yet.');
+    expect(html).not.toContain('Fabricated Author');
+  });
+
+  it('lets Readers search locally stored Works and open the stable detail view', async () => {
+    const other = await request('/api/works', {
+      method: 'POST',
+      cookie: otherReader.cookie,
+      body: { title: otherTitle },
+    });
+    expect(other.status).toBe(201);
+
+    const search = await request(`/api/works?q=${encodeURIComponent(title)}`, {
+      cookie: otherReader.cookie,
+    });
+    expect(search.status).toBe(200);
+    const found = (await search.json()) as WorkListResponse;
+    expect(found.works.map((work) => work.id)).toContain(created.id);
+    expect(found.works.map((work) => work.title)).not.toContain(otherTitle);
+
+    const catalogPage = await request(
+      `/works?q=${encodeURIComponent(title)}`,
+      { cookie: reader.cookie }
+    );
+    expect(catalogPage.status).toBe(200);
+    const html = await catalogPage.text();
+    expect(html).toContain(title);
+    expect(html).toContain(`/works/${created.id}`);
+    expect(html).not.toContain(otherTitle);
+  });
+
+  it('creates a Work from the catalog form without requiring other facts', async () => {
+    const formTitle = `Form Tract ${crypto.randomUUID()}`;
+    const response = await request('/works/new', {
+      method: 'POST',
+      cookie: reader.cookie,
+      form: new URLSearchParams({ title: formTitle }),
+    });
+    expect(response.status).toBe(302);
+    const location = response.headers.get('location');
+    expect(location).toBeTruthy();
+    const detailPath = new URL(location!, 'http://acceptance.invalid').pathname;
+    expect(detailPath).toMatch(/^\/works\/[0-9a-f-]{36}$/i);
+
+    const detail = await request(detailPath, { cookie: reader.cookie });
+    expect(detail.status).toBe(200);
+    const html = await detail.text();
+    expect(html).toContain(formTitle);
+    expect(html).toMatch(
+      /data-field="first-publication-date"[^>]*>\s*Unknown\s*</
+    );
+  });
+});
