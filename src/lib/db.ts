@@ -10,10 +10,6 @@ function foldSearchText(value: string): string {
   return value.normalize('NFC').toLowerCase();
 }
 
-function likeContainsPattern(value: string): string {
-  return `%${value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`;
-}
-
 /**
  * Inserts a Work and returns the persisted record with a generated ID.
  *
@@ -55,8 +51,10 @@ export async function getWorkById(id: string, env: Env): Promise<Work | undefine
  * Searches locally stored Works by title substring.
  *
  * Matching uses the persisted NFC-lowercase `titleSearch` key so D1 can filter
- * without SQLite `lower()` or loading the full catalog into the Worker. An
- * empty query returns a title-ordered page rather than every row.
+ * without SQLite `lower()` or loading the full catalog into the Worker. D1
+ * rejects LIKE patterns longer than 50 characters, so substring matching uses
+ * `instr` instead. An empty query returns a title-ordered page rather than
+ * every row.
  */
 export async function searchWorks(query: string, env: Env): Promise<Work[]> {
   try {
@@ -73,7 +71,7 @@ export async function searchWorks(query: string, env: Env): Promise<Work[]> {
     return await db
       .select()
       .from(works)
-      .where(sql`${works.titleSearch} LIKE ${likeContainsPattern(needle)} ESCAPE '\\'`)
+      .where(sql`instr(${works.titleSearch}, ${needle}) > 0`)
       .orderBy(asc(works.title))
       .limit(WORK_SEARCH_LIMIT);
   } catch (error) {
