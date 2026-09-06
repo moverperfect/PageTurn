@@ -209,6 +209,27 @@ describe('sparse Works', () => {
     expect(found.works.map((item) => item.id)).toContain(work.id);
   });
 
+  it('finds a Greek title when the query uses a non-final sigma', async () => {
+    const greekTitle = `ΟΣ ${crypto.randomUUID()}`;
+    const createdGreek = await request('/api/works', {
+      method: 'POST',
+      cookie: reader.cookie,
+      body: { title: greekTitle },
+    });
+    expect(createdGreek.status).toBe(201);
+    const work = (await createdGreek.json()) as WorkResource;
+
+    for (const query of ['Σ', 'ος']) {
+      const search = await request(
+        `/api/works?q=${encodeURIComponent(query)}`,
+        { cookie: otherReader.cookie }
+      );
+      expect(search.status).toBe(200);
+      const found = (await search.json()) as WorkListResponse;
+      expect(found.works.map((item) => item.id)).toContain(work.id);
+    }
+  });
+
   it('returns at most 50 Works for an empty catalog query', async () => {
     const prefix = `Bound ${crypto.randomUUID()}`;
     const createdBatch = await Promise.all(

@@ -7,14 +7,17 @@ import { v4 as uuidv4 } from 'uuid';
 const WORK_SEARCH_LIMIT = 50;
 
 function foldSearchText(value: string): string {
-  return value.normalize('NFC').toLowerCase();
+  // toLowerCase() maps Greek final sigma (ΟΣ → ος) but not a lone Σ → σ.
+  // Fold ς → σ so stored titles and queries share one substring key.
+  return value.normalize('NFC').toLowerCase().replaceAll('ς', 'σ');
 }
 
 /**
  * Inserts a Work and returns the persisted record with a generated ID.
  *
- * Persists `titleSearch` as the NFC-normalized, lowercased title so catalog
- * search can filter in D1 without loading the full table.
+ * Persists `titleSearch` as the NFC-normalized, lowercased title (with final
+ * sigma folded to σ) so catalog search can filter in D1 without loading the
+ * full table.
  */
 export async function insertWork(workData: Omit<Work, 'id' | 'titleSearch'>, env: Env): Promise<Work> {
   const newWork: Work = {
@@ -50,12 +53,12 @@ export async function getWorkById(id: string, env: Env): Promise<Work | undefine
 /**
  * Searches locally stored Works by title substring.
  *
- * Matching uses the persisted NFC-lowercase `titleSearch` key so D1 can filter
- * without SQLite `lower()` or loading the full catalog into the Worker. D1
- * rejects LIKE patterns longer than 50 characters, so substring matching uses
- * `instr` instead of `LIKE`. A btree cannot serve substring `instr`; FTS5 is
- * follow-on. An empty query returns a title-ordered page rather than every
- * row. Results are always bounded with LIMIT 50.
+ * Matching uses the persisted NFC-lowercase `titleSearch` key (final sigma
+ * folded to σ) so D1 can filter without SQLite `lower()` or loading the full
+ * catalog into the Worker. D1 rejects LIKE patterns longer than 50 characters,
+ * so substring matching uses `instr` instead of `LIKE`. A btree cannot serve
+ * substring `instr`; FTS5 is follow-on. An empty query returns a title-ordered
+ * page rather than every row. Results are always bounded with LIMIT 50.
  */
 export async function searchWorks(query: string, env: Env): Promise<Work[]> {
   try {
