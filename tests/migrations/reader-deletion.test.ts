@@ -165,6 +165,8 @@ describe('works title_search (0008)', () => {
 
       insertWork(db, 'work-ascii', 'Hello World');
       insertWork(db, 'work-kept', 'Kept Title');
+      // SQLite lower() folds ASCII only. D1 SQL cannot NFC-normalize.
+      insertWork(db, 'work-accent', 'Éclair');
 
       applyMigration(db, SEARCH_TAG);
 
@@ -172,6 +174,7 @@ describe('works title_search (0008)', () => {
         .prepare('SELECT id, title, title_search FROM works ORDER BY id')
         .all() as { id: string; title: string; title_search: string }[];
       expect(rows).toEqual([
+        { id: 'work-accent', title: 'Éclair', title_search: 'Éclair' },
         { id: 'work-ascii', title: 'Hello World', title_search: 'hello world' },
         { id: 'work-kept', title: 'Kept Title', title_search: 'kept title' },
       ]);

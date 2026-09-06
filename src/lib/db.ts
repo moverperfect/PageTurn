@@ -53,8 +53,9 @@ export async function getWorkById(id: string, env: Env): Promise<Work | undefine
  * Matching uses the persisted NFC-lowercase `titleSearch` key so D1 can filter
  * without SQLite `lower()` or loading the full catalog into the Worker. D1
  * rejects LIKE patterns longer than 50 characters, so substring matching uses
- * `instr` instead. An empty query returns a title-ordered page rather than
- * every row.
+ * `instr` instead of `LIKE`. A btree cannot serve substring `instr`; FTS5 is
+ * follow-on. An empty query returns a title-ordered page rather than every
+ * row. Results are always bounded with LIMIT 50.
  */
 export async function searchWorks(query: string, env: Env): Promise<Work[]> {
   try {
