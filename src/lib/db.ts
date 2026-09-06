@@ -1,8 +1,67 @@
 // Types for our book and reading session data
-import { eq, and, sql, inArray } from 'drizzle-orm';
+import { eq, and, sql, inArray, asc } from 'drizzle-orm';
 import { getDbClient } from './db-client';
-import { books, readingSessions, type Book, type ReadingSession } from './schema';
+import { books, readingSessions, works, type Book, type ReadingSession, type Work } from './schema';
 import { v4 as uuidv4 } from 'uuid';
+
+function foldSearchText(value: string): string {
+  return value.normalize('NFC').toLowerCase();
+}
+
+/**
+ * Inserts a Work and returns the persisted record with a generated ID.
+ */
+export async function insertWork(workData: Omit<Work, 'id'>, env: Env): Promise<Work> {
+  const newWork: Work = {
+    ...workData,
+    id: uuidv4(),
+  };
+
+  try {
+    const db = getDbClient(env);
+    await db.insert(works).values(newWork);
+    return newWork;
+  } catch (error) {
+    console.error('Error adding work:', error);
+    throw new Error(`Failed to add work: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Retrieves a Work by its unique ID.
+ */
+export async function getWorkById(id: string, env: Env): Promise<Work | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db.select().from(works).where(eq(works.id, id)).limit(1);
+    return results[0];
+  } catch (error) {
+    console.error('Error getting work by ID:', error);
+    throw new Error(`Failed to retrieve work: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Searches locally stored Works by title substring.
+ *
+ * Matching lowercases and NFC-normalizes both the query and stored titles in
+ * JavaScript so non-ASCII letters such as É fold the same way on both sides.
+ * An empty query returns every Work, ordered by title.
+ */
+export async function searchWorks(query: string, env: Env): Promise<Work[]> {
+  try {
+    const db = getDbClient(env);
+    const rows = await db.select().from(works).orderBy(asc(works.title));
+    const needle = foldSearchText(query.trim());
+    if (!needle) {
+      return rows;
+    }
+    return rows.filter((work) => foldSearchText(work.title).includes(needle));
+  } catch (error) {
+    console.error('Error searching works:', error);
+    throw new Error(`Failed to search works: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
 
 /**
  * Calculates reading progress statistics for a book based on its reading sessions.

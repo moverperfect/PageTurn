@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import type { APIRoute } from 'astro';
-import { getWorkById, toWorkResource } from '../../../lib/catalog';
+import { toWorkResource } from '../../../lib/catalog';
+import { getWorkById } from '../../../lib/db';
 import {
   getAuthenticatedUserId,
   jsonResponse,

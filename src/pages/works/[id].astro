@@ -1,7 +1,8 @@
 ---
 import { env } from 'cloudflare:workers';
 import Layout from '../../layouts/Layout.astro';
-import { getWorkById, toWorkResource } from '../../lib/catalog';
+import { toWorkResource } from '../../lib/catalog';
+import { getWorkById } from '../../lib/db';
 
 const { id } = Astro.params;
 const work = id ? await getWorkById(id, env) : undefined;

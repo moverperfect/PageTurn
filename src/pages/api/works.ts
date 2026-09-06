@@ -3,9 +3,9 @@ import type { APIRoute } from 'astro';
 import {
   CatalogValidationError,
   createWork,
-  searchWorks,
   toWorkResource,
 } from '../../lib/catalog';
+import { searchWorks } from '../../lib/db';
 import {
   getAuthenticatedUserId,
   jsonResponse,

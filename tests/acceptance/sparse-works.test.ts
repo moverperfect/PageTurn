@@ -151,6 +151,25 @@ describe('sparse Works', () => {
     expect(html).not.toContain(otherTitle);
   });
 
+  it('finds Works whose titles use non-ASCII letters regardless of query case', async () => {
+    const unicodeTitle = `Éclair ${crypto.randomUUID()}`;
+    const createdUnicode = await request('/api/works', {
+      method: 'POST',
+      cookie: reader.cookie,
+      body: { title: unicodeTitle },
+    });
+    expect(createdUnicode.status).toBe(201);
+    const work = (await createdUnicode.json()) as WorkResource;
+
+    const search = await request(
+      `/api/works?q=${encodeURIComponent(unicodeTitle.toLowerCase())}`,
+      { cookie: otherReader.cookie }
+    );
+    expect(search.status).toBe(200);
+    const found = (await search.json()) as WorkListResponse;
+    expect(found.works.map((item) => item.id)).toContain(work.id);
+  });
+
   it('creates a Work from the catalog form without requiring other facts', async () => {
     const formTitle = `Form Tract ${crypto.randomUUID()}`;
     const response = await request('/works/new', {

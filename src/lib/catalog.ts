@@ -1,7 +1,5 @@
-import { eq, sql, asc } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
-import { getDbClient } from './db-client';
-import { works, type Work } from './schema';
+import { insertWork } from './db';
+import type { Work } from './schema';
 
 export class CatalogValidationError extends Error {
   constructor(message: string) {
@@ -70,32 +68,11 @@ export async function createWork(
   input: { title?: unknown; firstPublicationDate?: unknown },
   env: Env
 ): Promise<Work> {
-  const work: Work = {
-    id: uuidv4(),
-    title: parseTitle(input.title),
-    firstPublicationDate: parseFirstPublicationDate(input.firstPublicationDate),
-  };
-
-  const db = getDbClient(env);
-  await db.insert(works).values(work);
-  return work;
-}
-
-export async function getWorkById(id: string, env: Env): Promise<Work | undefined> {
-  const db = getDbClient(env);
-  const results = await db.select().from(works).where(eq(works.id, id)).limit(1);
-  return results[0];
-}
-
-export async function searchWorks(query: string, env: Env): Promise<Work[]> {
-  const db = getDbClient(env);
-  const needle = query.trim().toLowerCase();
-  if (!needle) {
-    return db.select().from(works).orderBy(asc(works.title));
-  }
-  return db
-    .select()
-    .from(works)
-    .where(sql`instr(lower(${works.title}), ${needle}) > 0`)
-    .orderBy(asc(works.title));
+  return insertWork(
+    {
+      title: parseTitle(input.title),
+      firstPublicationDate: parseFirstPublicationDate(input.firstPublicationDate),
+    },
+    env
+  );
 }

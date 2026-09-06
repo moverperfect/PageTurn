@@ -1,7 +1,8 @@
 ---
 import { env } from 'cloudflare:workers';
 import Layout from '../../layouts/Layout.astro';
-import { searchWorks, toWorkResource } from '../../lib/catalog';
+import { toWorkResource } from '../../lib/catalog';
+import { searchWorks } from '../../lib/db';
 
 const query = Astro.url.searchParams.get('q') ?? '';
 const works = (await searchWorks(query, env)).map(toWorkResource);
