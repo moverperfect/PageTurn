@@ -1,5 +1,4 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { drizzle as drizzleSqlite } from 'drizzle-orm/better-sqlite3';
 import * as schema from './schema';
 
 // Singleton database client
@@ -11,7 +10,7 @@ let db: ReturnType<typeof createDrizzleClient>;
  * @param env - The environment object containing the D1 database binding.
  * @returns A Drizzle ORM client instance connected to the D1 database.
  */
-export function createDrizzleClient(env: Env): ReturnType<typeof drizzle> | ReturnType<typeof drizzleSqlite> {
+export function createDrizzleClient(env: Env): ReturnType<typeof drizzle> {
   console.log('Using D1 database in Cloudflare environment');
   // Use D1 database in Cloudflare environment
   return drizzle(env.DB, { schema });
