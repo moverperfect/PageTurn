@@ -6,21 +6,25 @@ import {
   editionContents,
   editions,
   readingSessions,
+  subjects,
   works,
+  workSubjects,
   type Book,
   type Edition,
   type EditionContent,
   type ReadingSession,
+  type Subject,
   type Work,
+  type WorkSubject,
 } from './schema';
 import { v4 as uuidv4 } from 'uuid';
 
 const WORK_SEARCH_LIMIT = 50;
 
-function foldSearchText(value: string): string {
-  // toLowerCase() maps Greek final sigma (ΟΣ → ος) but not a lone Σ → σ.
-  // Fold ς → σ so stored titles and queries share one substring key.
-  return value.normalize('NFC').toLowerCase().replaceAll('ς', 'σ');
+export function foldSearchText(value: string): string {
+  // toLowerCase() maps Greek final sigma (ΟΣ → ος) but not a lone Σ → σ,
+  // and leaves ß distinct from ss. Fold those so caseless keys match.
+  return value.normalize('NFC').toLowerCase().replaceAll('ß', 'ss').replaceAll('ς', 'σ');
 }
 
 /**
@@ -186,6 +190,163 @@ export async function getEditionsForWork(workId: string, env: Env): Promise<Edit
   } catch (error) {
     console.error('Error getting editions for work:', error);
     throw new Error(`Failed to retrieve editions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export interface SubjectClassification {
+  id: string;
+  name: string;
+  provenance: string | null;
+}
+
+/**
+ * Finds a Subject by its normalized name, if one already exists.
+ */
+export async function findSubjectByNormalizedName(
+  nameNormalized: string,
+  env: Env
+): Promise<Subject | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db
+      .select()
+      .from(subjects)
+      .where(eq(subjects.nameNormalized, nameNormalized))
+      .limit(1);
+    return results[0];
+  } catch (error) {
+    console.error('Error finding subject:', error);
+    throw new Error(`Failed to find subject: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Inserts a Subject, or returns the existing one when the normalized name is taken.
+ */
+export async function insertSubject(
+  name: string,
+  nameNormalized: string,
+  env: Env
+): Promise<Subject> {
+  const existing = await findSubjectByNormalizedName(nameNormalized, env);
+  if (existing) {
+    return existing;
+  }
+
+  const subject: Subject = {
+    id: uuidv4(),
+    name,
+    nameNormalized,
+  };
+
+  try {
+    const db = getDbClient(env);
+    await db.insert(subjects).values(subject);
+    return subject;
+  } catch (error) {
+    const raced = await findSubjectByNormalizedName(nameNormalized, env);
+    if (raced) {
+      return raced;
+    }
+    console.error('Error adding subject:', error);
+    throw new Error(`Failed to add subject: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Attaches a Subject to a Work, keeping the first provenance if already classified.
+ */
+export async function classifyWorkWithSubject(
+  workId: string,
+  subjectId: string,
+  provenance: string | null,
+  env: Env
+): Promise<WorkSubject> {
+  try {
+    const db = getDbClient(env);
+    const existing = await db
+      .select()
+      .from(workSubjects)
+      .where(and(eq(workSubjects.workId, workId), eq(workSubjects.subjectId, subjectId)))
+      .limit(1);
+    if (existing[0]) {
+      return existing[0];
+    }
+
+    const classification: WorkSubject = {
+      id: uuidv4(),
+      workId,
+      subjectId,
+      provenance,
+    };
+    await db.insert(workSubjects).values(classification);
+    return classification;
+  } catch (error) {
+    const db = getDbClient(env);
+    const raced = await db
+      .select()
+      .from(workSubjects)
+      .where(and(eq(workSubjects.workId, workId), eq(workSubjects.subjectId, subjectId)))
+      .limit(1);
+    if (raced[0]) {
+      return raced[0];
+    }
+    console.error('Error classifying work:', error);
+    throw new Error(`Failed to classify work: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Retrieves Subject classifications for one Work.
+ */
+export async function getSubjectClassificationsForWork(
+  workId: string,
+  env: Env
+): Promise<SubjectClassification[]> {
+  const byWork = await getSubjectClassificationsForWorks([workId], env);
+  return byWork.get(workId) ?? [];
+}
+
+/**
+ * Retrieves Subject classifications for many Works.
+ */
+export async function getSubjectClassificationsForWorks(
+  workIds: string[],
+  env: Env
+): Promise<Map<string, SubjectClassification[]>> {
+  const classified = new Map<string, SubjectClassification[]>();
+  if (workIds.length === 0) {
+    return classified;
+  }
+
+  try {
+    const db = getDbClient(env);
+    const rows = await db
+      .select({
+        workId: workSubjects.workId,
+        id: subjects.id,
+        name: subjects.name,
+        provenance: workSubjects.provenance,
+      })
+      .from(workSubjects)
+      .innerJoin(subjects, eq(subjects.id, workSubjects.subjectId))
+      .where(inArray(workSubjects.workId, workIds))
+      .orderBy(asc(subjects.name));
+
+    for (const id of workIds) {
+      classified.set(id, []);
+    }
+    for (const row of rows) {
+      classified.get(row.workId)?.push({
+        id: row.id,
+        name: row.name,
+        provenance: row.provenance ?? null,
+      });
+    }
+    return classified;
+  } catch (error) {
+    console.error('Error getting subject classifications:', error);
+    throw new Error(`Failed to retrieve subjects: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

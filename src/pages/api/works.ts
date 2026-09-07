@@ -3,6 +3,7 @@ import type { APIRoute } from 'astro';
 import {
   CatalogValidationError,
   createWork,
+  loadWorkResources,
   toWorkResource,
 } from '../../lib/catalog';
 import { searchWorks } from '../../lib/db';
@@ -19,7 +20,7 @@ export const GET: APIRoute = async ({ url, locals }) => {
 
   const query = url.searchParams.get('q') ?? '';
   const found = await searchWorks(query, env);
-  return jsonResponse({ works: found.map(toWorkResource) });
+  return jsonResponse({ works: await loadWorkResources(found, env) });
 };
 
 export const POST: APIRoute = async ({ request, locals }) => {
@@ -47,7 +48,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       },
       env
     );
-    return jsonResponse(toWorkResource(work), 201);
+    return jsonResponse(toWorkResource(work, []), 201);
   } catch (error) {
     if (error instanceof CatalogValidationError) {
       return jsonResponse({ error: error.message }, 400);

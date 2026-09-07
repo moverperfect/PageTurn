@@ -1,7 +1,7 @@
 ---
 import { env } from 'cloudflare:workers';
 import Layout from '../../layouts/Layout.astro';
-import { toWorkResource } from '../../lib/catalog';
+import { loadWorkResources } from '../../lib/catalog';
 import { searchWorks } from '../../lib/db';
 
 if (!Astro.locals.session?.User) {
@@ -9,7 +9,7 @@ if (!Astro.locals.session?.User) {
 }
 
 const query = Astro.url.searchParams.get('q') ?? '';
-const works = (await searchWorks(query, env)).map(toWorkResource);
+const works = await loadWorkResources(await searchWorks(query, env), env);
 ---
 
 <Layout title="Catalog | PageTurn">
@@ -59,6 +59,7 @@ const works = (await searchWorks(query, env)).map(toWorkResource);
               <tr class="bg-gray-100 dark:bg-slate-700">
                 <th class="px-4 py-3 text-left">Title</th>
                 <th class="px-4 py-3 text-left">First publication date</th>
+                <th class="px-4 py-3 text-left">Subjects</th>
               </tr>
             </thead>
             <tbody>
@@ -69,6 +70,11 @@ const works = (await searchWorks(query, env)).map(toWorkResource);
                   </td>
                   <td class="px-4 py-3 text-slate-400">
                     {work.firstPublicationDate ?? 'Unknown'}
+                  </td>
+                  <td class="px-4 py-3 text-slate-400" data-field="subjects">
+                    {work.subjects.length === 0
+                      ? 'None'
+                      : work.subjects.map((subject) => subject.name).join(', ')}
                   </td>
                 </tr>
               ))}
