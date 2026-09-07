@@ -67,6 +67,26 @@ describe('Open Library catalog suggestions', () => {
     expect(html).toContain('Open Library');
   });
 
+  it('keeps local search working when the provider returns a malformed payload', async () => {
+    const localTitle = `provider-malformed ${crypto.randomUUID()}`;
+    const created = await request('/api/works', {
+      method: 'POST',
+      cookie: reader.cookie,
+      body: { title: localTitle },
+    });
+    expect(created.status).toBe(201);
+
+    const search = await request(
+      `/api/works?q=${encodeURIComponent('provider-malformed')}`,
+      { cookie: reader.cookie }
+    );
+    expect(search.status).toBe(200);
+    const found = (await search.json()) as CatalogSearchResponse;
+    expect(found.providerError).toBe(true);
+    expect(found.suggestions).toEqual([]);
+    expect(found.works.map((work) => work.title)).toContain(localTitle);
+  });
+
   it('returns provider suggestions without mutating the local catalog', async () => {
     const before = await request('/api/works?q=Dispossessed', {
       cookie: reader.cookie,
