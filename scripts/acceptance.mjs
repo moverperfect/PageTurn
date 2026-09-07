@@ -18,6 +18,7 @@
  */
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { createServer } from "node:http";
 import { mkdtempSync, rmSync } from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -101,6 +102,53 @@ async function stopServer(child) {
   clearTimeout(timer);
 }
 
+function startProviderStub() {
+  const fixture = {
+    docs: [
+      {
+        key: "/works/OL82586W",
+        title: "The Dispossessed",
+        author_name: ["Ursula K. Le Guin"],
+        first_publish_year: 1974,
+        cover_i: 8234156,
+        edition_key: ["OL1M"],
+        isbn: ["9780061054884"],
+      },
+    ],
+  };
+
+  return new Promise((resolve) => {
+    const server = createServer((req, res) => {
+      const url = new URL(req.url ?? "/", "http://127.0.0.1");
+      if (url.pathname === "/search.json") {
+        const query = url.searchParams.get("q") ?? "";
+        if (query.includes("provider-outage")) {
+          res.writeHead(503, { "Content-Type": "text/plain" });
+          res.end("unavailable");
+          return;
+        }
+        if (query.includes("provider-malformed")) {
+          res.writeHead(200, { "Content-Type": "text/html" });
+          res.end("<html>not json</html>");
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(fixture));
+        return;
+      }
+      res.writeHead(404);
+      res.end("not found");
+    });
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      resolve({
+        server,
+        url: `http://127.0.0.1:${address.port}`,
+      });
+    });
+  });
+}
+
 const skipBuild = process.env.ACCEPTANCE_SKIP_BUILD === "1";
 if (skipBuild) {
   console.log("[acceptance] ACCEPTANCE_SKIP_BUILD=1, reusing existing dist/");
@@ -111,6 +159,7 @@ if (skipBuild) {
 
 const persistDir = mkdtempSync(path.join(os.tmpdir(), "pageturn-acceptance-"));
 let server;
+let providerStub;
 let torndown = false;
 
 async function teardown() {
@@ -121,6 +170,9 @@ async function teardown() {
   if (server) {
     console.log("[acceptance] Stopping worker");
     await stopServer(server);
+  }
+  if (providerStub) {
+    await new Promise((resolve) => providerStub.server.close(resolve));
   }
   rmSync(persistDir, { recursive: true, force: true });
   console.log("[acceptance] Cleaned up isolated database");
@@ -151,6 +203,7 @@ try {
   const port = await findFreePort();
   const baseURL = `http://127.0.0.1:${port}`;
   const authSecret = randomBytes(32).toString("hex");
+  providerStub = await startProviderStub();
 
   console.log(`[acceptance] Starting worker at ${baseURL}`);
   const vars = {
@@ -158,6 +211,7 @@ try {
     AUTH_TRUSTED_ORIGINS: baseURL,
     ACCEPTANCE_TEST_AUTH: "true",
     BETTER_AUTH_SECRET: authSecret,
+    OPEN_LIBRARY_BASE_URL: providerStub.url,
     // getAuth() requires OAuth credentials to exist; the suite never follows
     // a social login, so placeholder values are enough.
     GITHUB_CLIENT_ID: "acceptance-placeholder",

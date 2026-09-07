@@ -124,6 +124,12 @@ export const contributions = sqliteTable('contributions', {
   index('contributions_edition_id_idx').on(table.editionId),
 ]);
 
+export const catalogProviderCache = sqliteTable('catalog_provider_cache', {
+  cacheKey: text('cache_key').primaryKey(),
+  payload: text('payload').notNull(),
+  fetchedAt: integer('fetched_at').notNull(),
+});
+
 export const books = sqliteTable('books', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
@@ -246,6 +252,7 @@ export type Contributor = typeof contributors.$inferSelect;
 export type NewContributor = typeof contributors.$inferInsert;
 export type Contribution = typeof contributions.$inferSelect;
 export type NewContribution = typeof contributions.$inferInsert;
+export type CatalogProviderCache = typeof catalogProviderCache.$inferSelect;
 
 // Types for our book and reading session data
 export type Book = typeof books.$inferSelect;
