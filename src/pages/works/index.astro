@@ -1,15 +1,18 @@
 ---
 import { env } from 'cloudflare:workers';
 import Layout from '../../layouts/Layout.astro';
-import { loadWorkResources } from '../../lib/catalog';
-import { searchWorks } from '../../lib/db';
+import { searchCatalog } from '../../lib/catalog';
+
+if (!Astro.locals.session?.User) {
+  return Astro.redirect('/login');
+}
 
 if (!Astro.locals.session?.User) {
   return Astro.redirect('/login');
 }
 
 const query = Astro.url.searchParams.get('q') ?? '';
-const works = await loadWorkResources(await searchWorks(query, env), env);
+const works = await searchCatalog(query, env);
 ---
 
 <Layout title="Catalog | PageTurn">

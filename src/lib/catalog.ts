@@ -1,19 +1,30 @@
 import {
   classifyWorkWithSubject,
+  findIdentifier,
+  findIdentifiersByNormalizedValue,
+  getEditionById,
+  getEditionContents,
+  getIdentifiersForEdition,
   getSubjectClassificationsForWork,
   getSubjectClassificationsForWorks,
   getWorkById,
+  IdentifierConflictError,
+  insertEditionIdentifier,
   insertEditionWithContent,
   insertSubject,
   insertWork,
+  searchWorks,
   type SubjectClassification,
 } from './db';
 import {
   EDITION_FORMATS,
+  IDENTIFIER_NAMESPACES,
   PROGRESS_UNITS,
   type Edition,
   type EditionContent,
   type EditionFormat,
+  type EditionIdentifier,
+  type IdentifierNamespace,
   type ProgressUnit,
   type Work,
 } from './schema';
@@ -32,6 +43,13 @@ export class CatalogNotFoundError extends Error {
   }
 }
 
+export class CatalogConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CatalogConflictError';
+  }
+}
+
 export interface WorkResource {
   id: string;
   title: string;
@@ -42,6 +60,12 @@ export interface WorkResource {
 export interface EditionContentResource {
   workId: string;
   sortOrder: number;
+}
+
+export interface EditionIdentifierResource {
+  namespace: IdentifierNamespace;
+  value: string;
+  provenance: string | null;
 }
 
 export interface EditionResource {
@@ -55,7 +79,16 @@ export interface EditionResource {
   coverUrl: string | null;
   editionLength: number | null;
   contents: EditionContentResource[];
+  identifiers: EditionIdentifierResource[];
 }
+
+export const NAMESPACE_LABELS: Record<IdentifierNamespace, string> = {
+  isbn_10: 'ISBN-10',
+  isbn_13: 'ISBN-13',
+  asin: 'ASIN',
+  oclc: 'OCLC',
+  open_library: 'Open Library',
+};
 
 export const FORMAT_LABELS: Record<EditionFormat, string> = {
   print: 'Print',
@@ -101,7 +134,8 @@ export async function loadWorkResources(works: Work[], env: Env): Promise<WorkRe
 
 export function toEditionResource(
   edition: Edition,
-  contents: EditionContent[]
+  contents: EditionContent[],
+  identifiers: EditionIdentifier[] = []
 ): EditionResource {
   return {
     id: edition.id,
@@ -120,7 +154,20 @@ export function toEditionResource(
         workId: content.workId,
         sortOrder: content.sortOrder,
       })),
+    identifiers: identifiers.map((identifier) => ({
+      namespace: identifier.namespace,
+      value: identifier.value,
+      provenance: identifier.provenance ?? null,
+    })),
   };
+}
+
+export async function loadEditionResource(edition: Edition, env: Env): Promise<EditionResource> {
+  const [contents, identifiers] = await Promise.all([
+    getEditionContents(edition.id, env),
+    getIdentifiersForEdition(edition.id, env),
+  ]);
+  return toEditionResource(edition, contents, identifiers);
 }
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -327,4 +374,143 @@ export async function classifyWork(
   const subject = await insertSubject(name, nameNormalized, env);
   await classifyWorkWithSubject(work.id, subject.id, provenance, env);
   return loadWorkResource(work, env);
+}
+
+function parseNamespace(value: unknown): IdentifierNamespace {
+  if (value === undefined || value === null || value === '') {
+    throw new CatalogValidationError('Identifier namespace is required');
+  }
+  if (typeof value !== 'string' || !IDENTIFIER_NAMESPACES.includes(value as IdentifierNamespace)) {
+    throw new CatalogValidationError(
+      'Identifier namespace must be isbn_10, isbn_13, asin, oclc, or open_library'
+    );
+  }
+  return value as IdentifierNamespace;
+}
+
+export function normalizeIdentifierValue(
+  namespace: IdentifierNamespace,
+  value: string
+): string {
+  const trimmed = value.trim();
+  switch (namespace) {
+    case 'isbn_10':
+    case 'isbn_13':
+    case 'asin':
+      return trimmed.replace(/[-\s]/g, '').toUpperCase();
+    case 'oclc':
+      return trimmed.replace(/\s+/g, '').replace(/^oc[mn]/i, '');
+    case 'open_library':
+      return trimmed.replace(/^\/?(books|works)\//i, '').toUpperCase();
+  }
+}
+
+function parseIdentifierValue(
+  namespace: IdentifierNamespace,
+  value: unknown
+): { value: string; valueNormalized: string } {
+  if (typeof value !== 'string') {
+    throw new CatalogValidationError('Identifier value is required');
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new CatalogValidationError('Identifier value is required');
+  }
+  const valueNormalized = normalizeIdentifierValue(namespace, trimmed);
+  if (!valueNormalized) {
+    throw new CatalogValidationError('Identifier value is required');
+  }
+  return { value: trimmed, valueNormalized };
+}
+
+export async function assignEditionIdentifier(
+  editionId: string,
+  input: { namespace?: unknown; value?: unknown; provenance?: unknown },
+  env: Env
+): Promise<EditionResource> {
+  const edition = await getEditionById(editionId, env);
+  if (!edition) {
+    throw new CatalogNotFoundError('Edition not found');
+  }
+
+  const namespace = parseNamespace(input.namespace);
+  const { value, valueNormalized } = parseIdentifierValue(namespace, input.value);
+  try {
+    await insertEditionIdentifier(
+      {
+        editionId,
+        namespace,
+        value,
+        valueNormalized,
+        provenance: parseOptionalText(input.provenance, 'Provenance'),
+      },
+      env
+    );
+  } catch (error) {
+    if (error instanceof IdentifierConflictError) {
+      throw new CatalogConflictError(error.message);
+    }
+    throw error;
+  }
+
+  return loadEditionResource(edition, env);
+}
+
+export async function lookupEditionByIdentifier(
+  namespace: unknown,
+  value: unknown,
+  env: Env
+): Promise<EditionResource> {
+  const parsedNamespace = parseNamespace(namespace);
+  const { valueNormalized } = parseIdentifierValue(parsedNamespace, value);
+  const identifier = await findIdentifier(parsedNamespace, valueNormalized, env);
+  if (!identifier) {
+    throw new CatalogNotFoundError('Edition not found');
+  }
+  const edition = await getEditionById(identifier.editionId, env);
+  if (!edition) {
+    throw new CatalogNotFoundError('Edition not found');
+  }
+  return loadEditionResource(edition, env);
+}
+
+async function worksForIdentifiers(
+  identifiers: EditionIdentifier[],
+  env: Env
+): Promise<WorkResource[]> {
+  const editionIds = [...new Set(identifiers.map((identifier) => identifier.editionId))];
+  const workIds: string[] = [];
+  for (const editionId of editionIds) {
+    const contents = await getEditionContents(editionId, env);
+    for (const content of contents) {
+      if (!workIds.includes(content.workId)) {
+        workIds.push(content.workId);
+      }
+    }
+  }
+  const works = (
+    await Promise.all(workIds.map((id) => getWorkById(id, env)))
+  ).flatMap((work) => (work ? [work] : []));
+  return loadWorkResources(works, env);
+}
+
+export async function searchCatalog(query: string, env: Env): Promise<WorkResource[]> {
+  const needle = query.trim();
+  if (needle) {
+    const candidates = [
+      ...new Set(
+        IDENTIFIER_NAMESPACES.map((namespace) =>
+          normalizeIdentifierValue(namespace, needle)
+        ).filter(Boolean)
+      ),
+    ];
+    for (const candidate of candidates) {
+      const identifiers = await findIdentifiersByNormalizedValue(candidate, env);
+      if (identifiers.length > 0) {
+        return worksForIdentifiers(identifiers, env);
+      }
+    }
+  }
+
+  return loadWorkResources(await searchWorks(query, env), env);
 }
