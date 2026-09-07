@@ -9,4 +9,5 @@ CREATE TABLE `edition_identifiers` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `edition_identifiers_namespace_value_uidx` ON `edition_identifiers` (`namespace`,`value_normalized`);--> statement-breakpoint
+CREATE INDEX `edition_identifiers_value_normalized_idx` ON `edition_identifiers` (`value_normalized`);--> statement-breakpoint
 CREATE INDEX `edition_identifiers_edition_id_idx` ON `edition_identifiers` (`edition_id`);
