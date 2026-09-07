@@ -241,6 +241,11 @@ try {
   });
 
   await waitForReady(`${baseURL}/login`, 90_000);
+  // First unauthenticated GET /works can wait out local D1's 30s busy timeout
+  // while Astro loads the catalog page module. Prime those routes here so the
+  // 30s testTimeout in the suite is not spent on that cold hit.
+  await fetch(`${baseURL}/works`, { redirect: "manual" });
+  await fetch(`${baseURL}/works/new`, { redirect: "manual" });
   console.log("[acceptance] Worker is ready, running acceptance suite");
 
   await run("pnpm", ["exec", "vitest", "run", "--project", "acceptance"], {

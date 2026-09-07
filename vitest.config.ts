@@ -19,6 +19,7 @@ export default defineConfig({
           // The suite shares one worker and one D1 database; run files
           // sequentially so fixture setup and cleanup stay deterministic.
           fileParallelism: false,
+          maxWorkers: 1,
           testTimeout: 30_000,
           hookTimeout: 30_000,
         },
