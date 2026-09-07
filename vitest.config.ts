@@ -2,6 +2,11 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // Acceptance files share one worker and one D1 database. These options are
+    // root-only in Vitest; setting them on a project is ignored and files run
+    // in parallel, which deadlocks local D1 for SQLite's 30s busy timeout.
+    fileParallelism: false,
+    maxWorkers: 1,
     projects: [
       {
         test: {
@@ -16,10 +21,6 @@ export default defineConfig({
           // Runs against a built worker; invoke via `pnpm run test:acceptance`.
           name: 'acceptance',
           include: ['tests/acceptance/**/*.test.ts'],
-          // The suite shares one worker and one D1 database; run files
-          // sequentially so fixture setup and cleanup stay deterministic.
-          fileParallelism: false,
-          maxWorkers: 1,
           testTimeout: 30_000,
           hookTimeout: 30_000,
         },
