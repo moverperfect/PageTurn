@@ -609,6 +609,13 @@
           ],
           "isUnique": true
         },
+        "edition_identifiers_value_normalized_idx": {
+          "name": "edition_identifiers_value_normalized_idx",
+          "columns": [
+            "value_normalized"
+          ],
+          "isUnique": false
+        },
         "edition_identifiers_edition_id_idx": {
           "name": "edition_identifiers_edition_id_idx",
           "columns": [

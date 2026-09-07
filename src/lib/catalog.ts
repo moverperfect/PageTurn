@@ -5,10 +5,12 @@ import {
   foldSearchText,
   getCreditsForEdition,
   getCreditsForWork,
+  getCreditsForWorks,
   getEditionById,
   getEditionContents,
   getIdentifiersForEdition,
   getSubjectClassificationsForWork,
+  getSubjectClassificationsForWorks,
   getWorkById,
   IdentifierConflictError,
   insertEditionIdentifier,
@@ -154,7 +156,14 @@ export async function loadWorkResource(work: Work, env: Env): Promise<WorkResour
 }
 
 export async function loadWorkResources(works: Work[], env: Env): Promise<WorkResource[]> {
-  return Promise.all(works.map((work) => loadWorkResource(work, env)));
+  const workIds = works.map((work) => work.id);
+  const [classified, credited] = await Promise.all([
+    getSubjectClassificationsForWorks(workIds, env),
+    getCreditsForWorks(workIds, env),
+  ]);
+  return works.map((work) =>
+    toWorkResource(work, classified.get(work.id) ?? [], credited.get(work.id) ?? [])
+  );
 }
 
 export function toEditionResource(
@@ -610,13 +619,15 @@ export async function creditWork(
   if (!work) {
     throw new CatalogNotFoundError('Work not found');
   }
-  const contributor = await insertContributor(parseContributorName(input.name), env);
+  const name = parseContributorName(input.name);
+  const role = parseRole(input.role);
+  const contributor = await insertContributor(name, env);
   await insertContribution(
     {
       contributorId: contributor.id,
       workId: work.id,
       editionId: null,
-      role: parseRole(input.role),
+      role,
     },
     env
   );
@@ -632,13 +643,15 @@ export async function creditEdition(
   if (!edition) {
     throw new CatalogNotFoundError('Edition not found');
   }
-  const contributor = await insertContributor(parseContributorName(input.name), env);
+  const name = parseContributorName(input.name);
+  const role = parseRole(input.role);
+  const contributor = await insertContributor(name, env);
   await insertContribution(
     {
       contributorId: contributor.id,
       workId: null,
       editionId: edition.id,
-      role: parseRole(input.role),
+      role,
     },
     env
   );
