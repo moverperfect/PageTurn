@@ -2,6 +2,7 @@ import {
   classifyWorkWithSubject,
   findIdentifier,
   findIdentifiersByNormalizedValue,
+  foldSearchText,
   getCreditsForEdition,
   getCreditsForWork,
   getEditionById,
@@ -372,7 +373,7 @@ export async function createEdition(
 }
 
 function normalizeSubjectName(name: string): string {
-  return name.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase();
+  return foldSearchText(name.trim().replace(/\s+/g, ' '));
 }
 
 function parseSubjectName(value: unknown): { name: string; nameNormalized: string } {
