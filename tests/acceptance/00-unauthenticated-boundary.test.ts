@@ -15,12 +15,20 @@ describe('unauthenticated boundary', () => {
     expect(await works.json()).toEqual({ error: 'Unauthorized' });
   });
 
-  it('redirects page requests without a session to the login page', async () => {
-    for (const path of ['/books', '/works', '/works/new']) {
-      const response = await request(path);
-      expect(response.status).toBe(302);
-      expect(response.headers.get('location')).toBe('/login');
-    }
+  it('redirects library pages without a session to the login page', async () => {
+    const response = await request('/books');
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe('/login');
+  });
+
+  it('redirects catalog pages without a session to the login page', async () => {
+    const catalog = await request('/works');
+    expect(catalog.status).toBe(302);
+    expect(catalog.headers.get('location')).toBe('/login');
+
+    const create = await request('/works/new');
+    expect(create.status).toBe(302);
+    expect(create.headers.get('location')).toBe('/login');
   }, 45_000);
 
   it('serves the login page without a session', async () => {
