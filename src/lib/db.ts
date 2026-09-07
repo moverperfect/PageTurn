@@ -3,6 +3,8 @@ import { eq, and, sql, inArray, asc } from 'drizzle-orm';
 import { getDbClient } from './db-client';
 import {
   books,
+  contributions,
+  contributors,
   editionContents,
   editionIdentifiers,
   editions,
@@ -11,6 +13,8 @@ import {
   works,
   workSubjects,
   type Book,
+  type Contribution,
+  type Contributor,
   type Edition,
   type EditionContent,
   type EditionIdentifier,
@@ -461,6 +465,178 @@ export async function getSubjectClassificationsForWorks(
     console.error('Error getting subject classifications:', error);
     throw new Error(`Failed to retrieve subjects: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+}
+
+export interface ContributionCredit {
+  id: string;
+  role: Contribution['role'];
+  contributor: { id: string; name: string };
+}
+
+export async function findContributorByNameSearch(
+  nameSearch: string,
+  env: Env
+): Promise<Contributor | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db
+      .select()
+      .from(contributors)
+      .where(eq(contributors.nameSearch, nameSearch))
+      .limit(1);
+    return results[0];
+  } catch (error) {
+    console.error('Error finding contributor:', error);
+    throw new Error(`Failed to find contributor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export async function insertContributor(
+  name: string,
+  env: Env
+): Promise<Contributor> {
+  const nameSearch = foldSearchText(name);
+  const existing = await findContributorByNameSearch(nameSearch, env);
+  if (existing) {
+    return existing;
+  }
+
+  const contributor: Contributor = {
+    id: uuidv4(),
+    name,
+    nameSearch,
+  };
+
+  try {
+    const db = getDbClient(env);
+    await db.insert(contributors).values(contributor);
+    return contributor;
+  } catch (error) {
+    const raced = await findContributorByNameSearch(nameSearch, env);
+    if (raced) {
+      return raced;
+    }
+    console.error('Error adding contributor:', error);
+    throw new Error(`Failed to add contributor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export async function insertContribution(
+  contributionData: Omit<Contribution, 'id'>,
+  env: Env
+): Promise<Contribution> {
+  try {
+    const db = getDbClient(env);
+    const existing = await db
+      .select()
+      .from(contributions)
+      .where(
+        and(
+          eq(contributions.contributorId, contributionData.contributorId),
+          eq(contributions.role, contributionData.role),
+          contributionData.workId
+            ? eq(contributions.workId, contributionData.workId)
+            : eq(contributions.editionId, contributionData.editionId!)
+        )
+      )
+      .limit(1);
+    if (existing[0]) {
+      return existing[0];
+    }
+
+    const contribution: Contribution = { ...contributionData, id: uuidv4() };
+    await db.insert(contributions).values(contribution);
+    return contribution;
+  } catch (error) {
+    console.error('Error adding contribution:', error);
+    throw new Error(`Failed to add contribution: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export async function deleteContribution(id: string, env: Env): Promise<boolean> {
+  try {
+    const db = getDbClient(env);
+    const result = await db.delete(contributions).where(eq(contributions.id, id));
+    if ('success' in result) {
+      return result.success;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error deleting contribution:', error);
+    throw new Error(`Failed to delete contribution: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export async function getContributionById(
+  id: string,
+  env: Env
+): Promise<Contribution | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db
+      .select()
+      .from(contributions)
+      .where(eq(contributions.id, id))
+      .limit(1);
+    return results[0];
+  } catch (error) {
+    console.error('Error getting contribution:', error);
+    throw new Error(`Failed to retrieve contribution: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+async function creditsWhere(
+  column: typeof contributions.workId | typeof contributions.editionId,
+  ids: string[],
+  env: Env
+): Promise<Map<string, ContributionCredit[]>> {
+  const credits = new Map<string, ContributionCredit[]>();
+  if (ids.length === 0) {
+    return credits;
+  }
+
+  const db = getDbClient(env);
+  const rows = await db
+    .select({
+      targetId: column,
+      id: contributions.id,
+      role: contributions.role,
+      contributorId: contributors.id,
+      contributorName: contributors.name,
+    })
+    .from(contributions)
+    .innerJoin(contributors, eq(contributors.id, contributions.contributorId))
+    .where(inArray(column, ids))
+    .orderBy(asc(contributions.role), asc(contributors.name));
+
+  for (const id of ids) {
+    credits.set(id, []);
+  }
+  for (const row of rows) {
+    if (!row.targetId) {
+      continue;
+    }
+    credits.get(row.targetId)?.push({
+      id: row.id,
+      role: row.role,
+      contributor: { id: row.contributorId, name: row.contributorName },
+    });
+  }
+  return credits;
+}
+
+export async function getCreditsForWork(
+  workId: string,
+  env: Env
+): Promise<ContributionCredit[]> {
+  return (await creditsWhere(contributions.workId, [workId], env)).get(workId) ?? [];
+}
+
+export async function getCreditsForEdition(
+  editionId: string,
+  env: Env
+): Promise<ContributionCredit[]> {
+  return (await creditsWhere(contributions.editionId, [editionId], env)).get(editionId) ?? [];
 }
 
 /**
