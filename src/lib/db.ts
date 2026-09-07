@@ -638,7 +638,14 @@ export async function getCreditsForWork(
   workId: string,
   env: Env
 ): Promise<ContributionCredit[]> {
-  return (await creditsWhere(contributions.workId, [workId], env)).get(workId) ?? [];
+  return (await getCreditsForWorks([workId], env)).get(workId) ?? [];
+}
+
+export async function getCreditsForWorks(
+  workIds: string[],
+  env: Env
+): Promise<Map<string, ContributionCredit[]>> {
+  return creditsWhere(contributions.workId, workIds, env);
 }
 
 export async function getCreditsForEdition(

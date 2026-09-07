@@ -52,6 +52,23 @@ describe('role-qualified Contributions', () => {
     deleteFixtures([reader]);
   });
 
+  it('rejects an unknown role without creating a Contribution', async () => {
+    const response = await request(`/api/works/${work.id}/contributions`, {
+      method: 'POST',
+      cookie: reader.cookie,
+      body: { name: 'Orphan Contributor', role: 'publisher' },
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Contribution role must be author, editor, translator, illustrator, or narrator',
+    });
+
+    const detail = await request(`/api/works/${work.id}`, { cookie: reader.cookie });
+    expect(detail.status).toBe(200);
+    const resource = (await detail.json()) as WorkResource;
+    expect(resource.contributions).toEqual([]);
+  });
+
   it('credits multiple Contributors on a Work with distinct roles', async () => {
     const author = await request(`/api/works/${work.id}/contributions`, {
       method: 'POST',
