@@ -1,0 +1,39 @@
+import { describe, expect, it } from 'vitest';
+import { request } from './helpers';
+
+describe('unauthenticated boundary', () => {
+  it('rejects API requests without a session', async () => {
+    const books = await request('/api/books');
+    expect(books.status).toBe(401);
+    expect(await books.json()).toEqual({ error: 'Unauthorized' });
+
+    const works = await request('/api/works', {
+      method: 'POST',
+      body: { title: 'Unauthenticated Work' },
+    });
+    expect(works.status).toBe(401);
+    expect(await works.json()).toEqual({ error: 'Unauthorized' });
+  });
+
+  it('redirects library pages without a session to the login page', async () => {
+    const response = await request('/books');
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe('/login');
+  }, 45_000);
+
+  it('redirects catalog pages without a session to the login page', async () => {
+    const catalog = await request('/works');
+    expect(catalog.status).toBe(302);
+    expect(catalog.headers.get('location')).toBe('/login');
+
+    const create = await request('/works/new');
+    expect(create.status).toBe(302);
+    expect(create.headers.get('location')).toBe('/login');
+  }, 45_000);
+
+  it('serves the login page without a session', async () => {
+    const response = await request('/login');
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('PageTurn');
+  });
+});
