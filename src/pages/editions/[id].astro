@@ -2,11 +2,17 @@
 import { env } from 'cloudflare:workers';
 import Layout from '../../layouts/Layout.astro';
 import {
+  assignEditionIdentifier,
+  CatalogConflictError,
+  CatalogNotFoundError,
+  CatalogValidationError,
   FORMAT_LABELS,
+  loadEditionResource,
+  NAMESPACE_LABELS,
   PROGRESS_UNIT_LABELS,
-  toEditionResource,
   toWorkResource,
 } from '../../lib/catalog';
+import { IDENTIFIER_NAMESPACES } from '../../lib/schema';
 import { getEditionById, getEditionContents, getWorkById } from '../../lib/db';
 
 const { id } = Astro.params;
@@ -20,8 +26,34 @@ if (!edition) {
   Astro.response.status = 404;
 }
 
-const resource = edition ? toEditionResource(edition, contents) : null;
+let resource = edition ? await loadEditionResource(edition, env) : null;
 const workResources = works.flatMap((work) => (work ? [toWorkResource(work)] : []));
+let identifierError = '';
+let identifierForm = { namespace: '', value: '', provenance: '' };
+
+if (resource && Astro.request.method === 'POST') {
+  try {
+    const data = await Astro.request.formData();
+    identifierForm = {
+      namespace: (data.get('namespace') as string) || '',
+      value: (data.get('value') as string) || '',
+      provenance: (data.get('provenance') as string) || '',
+    };
+    resource = await assignEditionIdentifier(resource.id, identifierForm, env);
+    identifierForm = { namespace: '', value: '', provenance: '' };
+  } catch (error) {
+    if (
+      error instanceof CatalogValidationError ||
+      error instanceof CatalogNotFoundError ||
+      error instanceof CatalogConflictError
+    ) {
+      identifierError = error.message;
+    } else {
+      console.error('Error assigning identifier:', error);
+      identifierError = 'Failed to add identifier. Please try again.';
+    }
+  }
+}
 ---
 
 <Layout title={resource ? `${resource.displayedTitle ?? 'Edition'} | PageTurn` : 'Edition not found | PageTurn'}>
@@ -86,6 +118,85 @@ const workResources = works.flatMap((work) => (work ? [toWorkResource(work)] : [
             </dd>
           </div>
         </dl>
+        <section class="mt-8 max-w-2xl">
+          <h2>Identifiers</h2>
+          {resource.identifiers.length === 0 ? (
+            <p data-field="identifiers-empty" class="text-slate-400">
+              This Edition has no identifiers.
+            </p>
+          ) : (
+            <ul data-field="identifiers" class="mt-4 space-y-2">
+              {resource.identifiers.map((identifier) => (
+                <li data-namespace={identifier.namespace}>
+                  <span data-field="identifier-namespace">
+                    {NAMESPACE_LABELS[identifier.namespace]}
+                  </span>
+                  <span data-field="identifier-value" class="ml-2">
+                    {identifier.value}
+                  </span>
+                  {identifier.provenance && (
+                    <span data-field="identifier-provenance" class="text-slate-400 text-sm ml-2">
+                      {identifier.provenance}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {identifierError && (
+            <div
+              class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded my-4"
+              role="alert"
+            >
+              <p>{identifierError}</p>
+            </div>
+          )}
+
+          <form method="POST" class="mt-6 space-y-4">
+            <div>
+              <label for="namespace" class="form-label">Namespace</label>
+              <select id="namespace" name="namespace" required class="form-input">
+                <option value="" selected={identifierForm.namespace === ''}>
+                  Select a namespace
+                </option>
+                {IDENTIFIER_NAMESPACES.map((namespace) => (
+                  <option
+                    value={namespace}
+                    selected={identifierForm.namespace === namespace}
+                  >
+                    {NAMESPACE_LABELS[namespace]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label for="value" class="form-label">Value</label>
+              <input
+                type="text"
+                id="value"
+                name="value"
+                required
+                class="form-input"
+                value={identifierForm.value}
+              />
+            </div>
+            <div>
+              <label for="provenance" class="form-label">
+                Provenance
+                <span class="text-slate-400 font-normal"> (optional)</span>
+              </label>
+              <input
+                type="text"
+                id="provenance"
+                name="provenance"
+                class="form-input"
+                value={identifierForm.provenance}
+              />
+            </div>
+            <button type="submit" class="btn">Add identifier</button>
+          </form>
+        </section>
         <section class="mt-8">
           <h2>Works in this Edition</h2>
           <ul data-field="edition-contents" class="mt-4 space-y-2">

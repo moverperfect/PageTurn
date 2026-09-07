@@ -23,6 +23,7 @@ interface EditionResource {
   coverUrl: string | null;
   editionLength: number | null;
   contents: { workId: string; sortOrder: number }[];
+  identifiers: { namespace: string; value: string; provenance: string | null }[];
 }
 
 describe('create Editions for a Work', () => {
@@ -137,6 +138,7 @@ describe('create Editions for a Work', () => {
       coverUrl: null,
       editionLength: null,
       contents: [{ workId: work.id, sortOrder: 0 }],
+      identifiers: [],
     });
   });
 
