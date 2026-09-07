@@ -85,6 +85,13 @@
       "when": 1788771265070,
       "tag": "0011_create_edition_identifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1788771856676,
+      "tag": "0012_create_contributors",
+      "breakpoints": true
     }
   ]
 }
