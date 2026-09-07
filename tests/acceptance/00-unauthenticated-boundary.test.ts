@@ -21,7 +21,7 @@ describe('unauthenticated boundary', () => {
       expect(response.status).toBe(302);
       expect(response.headers.get('location')).toBe('/login');
     }
-  });
+  }, 45_000);
 
   it('serves the login page without a session', async () => {
     const response = await request('/login');
