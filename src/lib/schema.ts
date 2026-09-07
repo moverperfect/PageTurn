@@ -53,6 +53,7 @@ export const editionIdentifiers = sqliteTable('edition_identifiers', {
     table.namespace,
     table.valueNormalized
   ),
+  index('edition_identifiers_value_normalized_idx').on(table.valueNormalized),
   index('edition_identifiers_edition_id_idx').on(table.editionId),
 ]);
 
