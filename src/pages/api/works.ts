@@ -19,7 +19,7 @@ export const GET: APIRoute = async ({ url, locals }) => {
 
   const query = url.searchParams.get('q') ?? '';
   const found = await searchCatalog(query, env);
-  return jsonResponse({ works: found });
+  return jsonResponse(found);
 };
 
 export const POST: APIRoute = async ({ request, locals }) => {

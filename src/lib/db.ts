@@ -3,6 +3,7 @@ import { eq, and, sql, inArray, asc } from 'drizzle-orm';
 import { getDbClient } from './db-client';
 import {
   books,
+  catalogProviderCache,
   contributions,
   contributors,
   editionContents,
@@ -582,6 +583,53 @@ export async function getContributionById(
   } catch (error) {
     console.error('Error getting contribution:', error);
     throw new Error(`Failed to retrieve contribution: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+const PROVIDER_CACHE_TTL_SECONDS = 60 * 60;
+
+export async function getProviderCache(
+  cacheKey: string,
+  env: Env
+): Promise<string | null> {
+  try {
+    const db = getDbClient(env);
+    const rows = await db
+      .select()
+      .from(catalogProviderCache)
+      .where(eq(catalogProviderCache.cacheKey, cacheKey))
+      .limit(1);
+    const row = rows[0];
+    if (!row) {
+      return null;
+    }
+    if (Math.floor(Date.now() / 1000) - row.fetchedAt > PROVIDER_CACHE_TTL_SECONDS) {
+      return null;
+    }
+    return row.payload;
+  } catch (error) {
+    console.error('Error reading provider cache:', error);
+    return null;
+  }
+}
+
+export async function setProviderCache(
+  cacheKey: string,
+  payload: string,
+  env: Env
+): Promise<void> {
+  try {
+    const db = getDbClient(env);
+    const fetchedAt = Math.floor(Date.now() / 1000);
+    await db
+      .insert(catalogProviderCache)
+      .values({ cacheKey, payload, fetchedAt })
+      .onConflictDoUpdate({
+        target: catalogProviderCache.cacheKey,
+        set: { payload, fetchedAt },
+      });
+  } catch (error) {
+    console.error('Error writing provider cache:', error);
   }
 }
 
