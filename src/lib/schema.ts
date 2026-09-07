@@ -1,5 +1,11 @@
 import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
 
+export const EDITION_FORMATS = ['print', 'ebook', 'audiobook'] as const;
+export type EditionFormat = (typeof EDITION_FORMATS)[number];
+
+export const PROGRESS_UNITS = ['page', 'time_position'] as const;
+export type ProgressUnit = (typeof PROGRESS_UNITS)[number];
+
 export const works = sqliteTable('works', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
@@ -8,6 +14,34 @@ export const works = sqliteTable('works', {
 }, (table) => [
   index('works_title_idx').on(table.title),
   index('works_title_search_idx').on(table.titleSearch),
+]);
+
+export const editions = sqliteTable('editions', {
+  id: text('id').primaryKey(),
+  displayedTitle: text('displayed_title'),
+  language: text('language'),
+  publisher: text('publisher'),
+  publicationDate: text('publication_date'),
+  format: text('format', { enum: EDITION_FORMATS }).notNull(),
+  progressUnit: text('progress_unit', { enum: PROGRESS_UNITS }).notNull(),
+  coverUrl: text('cover_url'),
+  editionLength: integer('edition_length'),
+}, (table) => [
+  index('editions_format_idx').on(table.format),
+]);
+
+export const editionContents = sqliteTable('edition_contents', {
+  id: text('id').primaryKey(),
+  editionId: text('edition_id')
+    .notNull()
+    .references(() => editions.id, { onDelete: 'cascade' }),
+  workId: text('work_id')
+    .notNull()
+    .references(() => works.id),
+  sortOrder: integer('sort_order').notNull(),
+}, (table) => [
+  index('edition_contents_edition_id_idx').on(table.editionId),
+  index('edition_contents_work_id_idx').on(table.workId),
 ]);
 
 export const books = sqliteTable('books', {
@@ -118,6 +152,10 @@ export const verification = sqliteTable("verification", {
 
 export type Work = typeof works.$inferSelect;
 export type NewWork = typeof works.$inferInsert;
+export type Edition = typeof editions.$inferSelect;
+export type NewEdition = typeof editions.$inferInsert;
+export type EditionContent = typeof editionContents.$inferSelect;
+export type NewEditionContent = typeof editionContents.$inferInsert;
 
 // Types for our book and reading session data
 export type Book = typeof books.$inferSelect;

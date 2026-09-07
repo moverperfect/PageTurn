@@ -1,11 +1,12 @@
 ---
 import { env } from 'cloudflare:workers';
 import Layout from '../../layouts/Layout.astro';
-import { toWorkResource } from '../../lib/catalog';
-import { getWorkById } from '../../lib/db';
+import { FORMAT_LABELS, toWorkResource } from '../../lib/catalog';
+import { getEditionsForWork, getWorkById } from '../../lib/db';
 
 const { id } = Astro.params;
 const work = id ? await getWorkById(id, env) : undefined;
+const editions = work ? await getEditionsForWork(work.id, env) : [];
 
 if (!work) {
   Astro.response.status = 404;
@@ -37,10 +38,30 @@ const resource = work ? toWorkResource(work) : null;
           </div>
         </dl>
         <section class="mt-8">
-          <h2>Editions</h2>
-          <p data-field="editions-empty" class="text-slate-400">
-            This Work has no Editions yet.
-          </p>
+          <div class="flex justify-between items-center mb-4">
+            <h2>Editions</h2>
+            <a href={`/works/${resource.id}/editions/new`} class="btn">
+              Create Edition
+            </a>
+          </div>
+          {editions.length === 0 ? (
+            <p data-field="editions-empty" class="text-slate-400">
+              This Work has no Editions yet.
+            </p>
+          ) : (
+            <ul data-field="editions" class="space-y-3">
+              {editions.map((edition) => (
+                <li class="card">
+                  <a href={`/editions/${edition.id}`} data-edition-id={edition.id}>
+                    {edition.displayedTitle ?? 'Untitled Edition'}
+                  </a>
+                  <p class="text-sm text-slate-400 mt-1">
+                    {FORMAT_LABELS[edition.format]}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </div>
     ) : (
