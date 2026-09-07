@@ -12,6 +12,10 @@ import {
 import { EDITION_FORMATS, PROGRESS_UNITS } from '../../../../lib/schema';
 import { getWorkById } from '../../../../lib/db';
 
+if (!Astro.locals.session?.User) {
+  return Astro.redirect('/login');
+}
+
 const { id: workId } = Astro.params;
 const work = workId ? await getWorkById(workId, env) : undefined;
 
