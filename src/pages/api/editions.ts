@@ -4,6 +4,7 @@ import {
   CatalogNotFoundError,
   CatalogValidationError,
   createEdition,
+  lookupEditionByIdentifier,
   toEditionResource,
 } from '../../lib/catalog';
 import {
@@ -11,6 +12,35 @@ import {
   jsonResponse,
   unauthorizedResponse,
 } from '../../lib/api-auth';
+
+export const GET: APIRoute = async ({ url, locals }) => {
+  if (!getAuthenticatedUserId(locals)) {
+    return unauthorizedResponse();
+  }
+
+  const namespace = url.searchParams.get('namespace');
+  const value = url.searchParams.get('value');
+  if (!namespace || !value) {
+    return jsonResponse(
+      { error: 'Identifier namespace and value are required' },
+      400
+    );
+  }
+
+  try {
+    const edition = await lookupEditionByIdentifier(namespace, value, env);
+    return jsonResponse(edition);
+  } catch (error) {
+    if (error instanceof CatalogValidationError) {
+      return jsonResponse({ error: error.message }, 400);
+    }
+    if (error instanceof CatalogNotFoundError) {
+      return jsonResponse({ error: error.message }, 404);
+    }
+    console.error('Error looking up Edition:', error);
+    return jsonResponse({ error: 'Failed to look up Edition' }, 500);
+  }
+};
 
 export const POST: APIRoute = async ({ request, locals }) => {
   if (!getAuthenticatedUserId(locals)) {

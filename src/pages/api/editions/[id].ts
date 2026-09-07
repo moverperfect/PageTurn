@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import type { APIRoute } from 'astro';
-import { toEditionResource } from '../../../lib/catalog';
-import { getEditionById, getEditionContents } from '../../../lib/db';
+import { CatalogNotFoundError, loadEditionResource } from '../../../lib/catalog';
+import { getEditionById } from '../../../lib/db';
 import {
   getAuthenticatedUserId,
   jsonResponse,
@@ -23,6 +23,13 @@ export const GET: APIRoute = async ({ params, locals }) => {
     return jsonResponse({ error: 'Edition not found' }, 404);
   }
 
-  const contents = await getEditionContents(id, env);
-  return jsonResponse(toEditionResource(edition, contents));
+  try {
+    return jsonResponse(await loadEditionResource(edition, env));
+  } catch (error) {
+    if (error instanceof CatalogNotFoundError) {
+      return jsonResponse({ error: error.message }, 404);
+    }
+    console.error('Error loading Edition:', error);
+    return jsonResponse({ error: 'Failed to load Edition' }, 500);
+  }
 };

@@ -6,6 +6,15 @@ export type EditionFormat = (typeof EDITION_FORMATS)[number];
 export const PROGRESS_UNITS = ['page', 'time_position'] as const;
 export type ProgressUnit = (typeof PROGRESS_UNITS)[number];
 
+export const IDENTIFIER_NAMESPACES = [
+  'isbn_10',
+  'isbn_13',
+  'asin',
+  'oclc',
+  'open_library',
+] as const;
+export type IdentifierNamespace = (typeof IDENTIFIER_NAMESPACES)[number];
+
 export const works = sqliteTable('works', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
@@ -28,6 +37,23 @@ export const editions = sqliteTable('editions', {
   editionLength: integer('edition_length'),
 }, (table) => [
   index('editions_format_idx').on(table.format),
+]);
+
+export const editionIdentifiers = sqliteTable('edition_identifiers', {
+  id: text('id').primaryKey(),
+  editionId: text('edition_id')
+    .notNull()
+    .references(() => editions.id, { onDelete: 'cascade' }),
+  namespace: text('namespace', { enum: IDENTIFIER_NAMESPACES }).notNull(),
+  value: text('value').notNull(),
+  valueNormalized: text('value_normalized').notNull(),
+  provenance: text('provenance'),
+}, (table) => [
+  uniqueIndex('edition_identifiers_namespace_value_uidx').on(
+    table.namespace,
+    table.valueNormalized
+  ),
+  index('edition_identifiers_edition_id_idx').on(table.editionId),
 ]);
 
 export const editionContents = sqliteTable('edition_contents', {
@@ -178,6 +204,8 @@ export type Edition = typeof editions.$inferSelect;
 export type NewEdition = typeof editions.$inferInsert;
 export type EditionContent = typeof editionContents.$inferSelect;
 export type NewEditionContent = typeof editionContents.$inferInsert;
+export type EditionIdentifier = typeof editionIdentifiers.$inferSelect;
+export type NewEditionIdentifier = typeof editionIdentifiers.$inferInsert;
 export type Subject = typeof subjects.$inferSelect;
 export type NewSubject = typeof subjects.$inferInsert;
 export type WorkSubject = typeof workSubjects.$inferSelect;

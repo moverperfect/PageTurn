@@ -4,6 +4,7 @@ import { getDbClient } from './db-client';
 import {
   books,
   editionContents,
+  editionIdentifiers,
   editions,
   readingSessions,
   subjects,
@@ -12,6 +13,7 @@ import {
   type Book,
   type Edition,
   type EditionContent,
+  type EditionIdentifier,
   type ReadingSession,
   type Subject,
   type Work,
@@ -190,6 +192,126 @@ export async function getEditionsForWork(workId: string, env: Env): Promise<Edit
   } catch (error) {
     console.error('Error getting editions for work:', error);
     throw new Error(`Failed to retrieve editions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export class IdentifierConflictError extends Error {
+  constructor(
+    message: string,
+    readonly existingEditionId: string
+  ) {
+    super(message);
+    this.name = 'IdentifierConflictError';
+  }
+}
+
+/**
+ * Retrieves typed identifiers for an Edition.
+ */
+export async function getIdentifiersForEdition(
+  editionId: string,
+  env: Env
+): Promise<EditionIdentifier[]> {
+  try {
+    const db = getDbClient(env);
+    return await db
+      .select()
+      .from(editionIdentifiers)
+      .where(eq(editionIdentifiers.editionId, editionId))
+      .orderBy(asc(editionIdentifiers.namespace), asc(editionIdentifiers.value));
+  } catch (error) {
+    console.error('Error getting edition identifiers:', error);
+    throw new Error(`Failed to retrieve identifiers: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Finds an identifier by namespace and normalized value.
+ */
+export async function findIdentifier(
+  namespace: EditionIdentifier['namespace'],
+  valueNormalized: string,
+  env: Env
+): Promise<EditionIdentifier | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db
+      .select()
+      .from(editionIdentifiers)
+      .where(
+        and(
+          eq(editionIdentifiers.namespace, namespace),
+          eq(editionIdentifiers.valueNormalized, valueNormalized)
+        )
+      )
+      .limit(1);
+    return results[0];
+  } catch (error) {
+    console.error('Error finding identifier:', error);
+    throw new Error(`Failed to find identifier: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Finds identifiers whose normalized value matches, any namespace.
+ */
+export async function findIdentifiersByNormalizedValue(
+  valueNormalized: string,
+  env: Env
+): Promise<EditionIdentifier[]> {
+  try {
+    const db = getDbClient(env);
+    return await db
+      .select()
+      .from(editionIdentifiers)
+      .where(eq(editionIdentifiers.valueNormalized, valueNormalized))
+      .orderBy(asc(editionIdentifiers.namespace));
+  } catch (error) {
+    console.error('Error finding identifiers by value:', error);
+    throw new Error(`Failed to find identifier: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Assigns a typed identifier to an Edition. Conflicting values are rejected.
+ */
+export async function insertEditionIdentifier(
+  identifier: Omit<EditionIdentifier, 'id'>,
+  env: Env
+): Promise<EditionIdentifier> {
+  const existing = await findIdentifier(identifier.namespace, identifier.valueNormalized, env);
+  if (existing) {
+    if (existing.editionId === identifier.editionId) {
+      return existing;
+    }
+    throw new IdentifierConflictError(
+      'That identifier is already assigned to another Edition',
+      existing.editionId
+    );
+  }
+
+  const row: EditionIdentifier = {
+    ...identifier,
+    id: uuidv4(),
+  };
+
+  try {
+    const db = getDbClient(env);
+    await db.insert(editionIdentifiers).values(row);
+    return row;
+  } catch (error) {
+    const raced = await findIdentifier(identifier.namespace, identifier.valueNormalized, env);
+    if (raced) {
+      if (raced.editionId === identifier.editionId) {
+        return raced;
+      }
+      throw new IdentifierConflictError(
+        'That identifier is already assigned to another Edition',
+        raced.editionId
+      );
+    }
+    console.error('Error adding identifier:', error);
+    throw new Error(`Failed to add identifier: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
