@@ -1,0 +1,110 @@
+---
+import { env } from 'cloudflare:workers';
+import Layout from '../../layouts/Layout.astro';
+import {
+  FORMAT_LABELS,
+  PROGRESS_UNIT_LABELS,
+  toEditionResource,
+  toWorkResource,
+} from '../../lib/catalog';
+import { getEditionById, getEditionContents, getWorkById } from '../../lib/db';
+
+const { id } = Astro.params;
+const edition = id ? await getEditionById(id, env) : undefined;
+const contents = edition ? await getEditionContents(edition.id, env) : [];
+const works = await Promise.all(
+  contents.map((content) => getWorkById(content.workId, env))
+);
+
+if (!edition) {
+  Astro.response.status = 404;
+}
+
+const resource = edition ? toEditionResource(edition, contents) : null;
+const workResources = works.flatMap((work) => (work ? [toWorkResource(work)] : []));
+---
+
+<Layout title={resource ? `${resource.displayedTitle ?? 'Edition'} | PageTurn` : 'Edition not found | PageTurn'}>
+  {
+    resource ? (
+      <div>
+        <p class="mb-4">
+          {workResources[0] ? (
+            <a href={`/works/${workResources[0].id}`}>Back to {workResources[0].title}</a>
+          ) : (
+            <a href="/works">Back to catalog</a>
+          )}
+        </p>
+        <h1 data-field="heading">
+          {resource.displayedTitle ?? 'Untitled Edition'}
+        </h1>
+        <dl class="card max-w-2xl space-y-4">
+          <div>
+            <dt class="text-sm text-slate-400">Displayed title</dt>
+            <dd data-field="displayed-title">
+              {resource.displayedTitle ?? 'Unknown'}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">Format</dt>
+            <dd data-field="format">{FORMAT_LABELS[resource.format]}</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">Progress Unit</dt>
+            <dd data-field="progress-unit">
+              {PROGRESS_UNIT_LABELS[resource.progressUnit]}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">Language</dt>
+            <dd data-field="language">{resource.language ?? 'Unknown'}</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">Publisher</dt>
+            <dd data-field="publisher">{resource.publisher ?? 'Unknown'}</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">Publication date</dt>
+            <dd data-field="publication-date">
+              {resource.publicationDate ?? 'Unknown'}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">Cover</dt>
+            <dd data-field="cover">
+              {resource.coverUrl ? (
+                <img src={resource.coverUrl} alt="" class="max-h-48 rounded" />
+              ) : (
+                'Unknown'
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">Edition Length</dt>
+            <dd data-field="edition-length">
+              {resource.editionLength ?? 'Unknown'}
+            </dd>
+          </div>
+        </dl>
+        <section class="mt-8">
+          <h2>Works in this Edition</h2>
+          <ul data-field="edition-contents" class="mt-4 space-y-2">
+            {workResources.map((work) => (
+              <li>
+                <a href={`/works/${work.id}`}>{work.title}</a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+    ) : (
+      <div class="card text-center py-12">
+        <h1>Edition not found</h1>
+        <p class="mb-6">That Edition is not in the local catalog.</p>
+        <a href="/works" class="btn">
+          Back to catalog
+        </a>
+      </div>
+    )
+  }
+</Layout>

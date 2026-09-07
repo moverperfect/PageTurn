@@ -1,7 +1,18 @@
 // Types for our book and reading session data
 import { eq, and, sql, inArray, asc } from 'drizzle-orm';
 import { getDbClient } from './db-client';
-import { books, readingSessions, works, type Book, type ReadingSession, type Work } from './schema';
+import {
+  books,
+  editionContents,
+  editions,
+  readingSessions,
+  works,
+  type Book,
+  type Edition,
+  type EditionContent,
+  type ReadingSession,
+  type Work,
+} from './schema';
 import { v4 as uuidv4 } from 'uuid';
 
 const WORK_SEARCH_LIMIT = 50;
@@ -81,6 +92,100 @@ export async function searchWorks(query: string, env: Env): Promise<Work[]> {
   } catch (error) {
     console.error('Error searching works:', error);
     throw new Error(`Failed to search works: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Inserts an Edition and its Edition Content for a Work in one D1 batch.
+ */
+export async function insertEditionWithContent(
+  editionData: Omit<Edition, 'id'>,
+  workId: string,
+  env: Env
+): Promise<{ edition: Edition; contents: EditionContent[] }> {
+  const edition: Edition = {
+    ...editionData,
+    id: uuidv4(),
+  };
+  const content: EditionContent = {
+    id: uuidv4(),
+    editionId: edition.id,
+    workId,
+    sortOrder: 0,
+  };
+
+  try {
+    const db = getDbClient(env);
+    await db.batch([
+      db.insert(editions).values(edition),
+      db.insert(editionContents).values(content),
+    ]);
+    return { edition, contents: [content] };
+  } catch (error) {
+    console.error('Error adding edition:', error);
+    throw new Error(`Failed to add edition: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Retrieves an Edition by its unique ID.
+ */
+export async function getEditionById(id: string, env: Env): Promise<Edition | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db.select().from(editions).where(eq(editions.id, id)).limit(1);
+    return results[0];
+  } catch (error) {
+    console.error('Error getting edition by ID:', error);
+    throw new Error(`Failed to retrieve edition: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Retrieves Edition Contents for an Edition, ordered for display.
+ */
+export async function getEditionContents(
+  editionId: string,
+  env: Env
+): Promise<EditionContent[]> {
+  try {
+    const db = getDbClient(env);
+    return await db
+      .select()
+      .from(editionContents)
+      .where(eq(editionContents.editionId, editionId))
+      .orderBy(asc(editionContents.sortOrder));
+  } catch (error) {
+    console.error('Error getting edition contents:', error);
+    throw new Error(`Failed to retrieve edition contents: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Retrieves Editions that contain a Work, oldest-created first via content order.
+ */
+export async function getEditionsForWork(workId: string, env: Env): Promise<Edition[]> {
+  try {
+    const db = getDbClient(env);
+    return await db
+      .select({
+        id: editions.id,
+        displayedTitle: editions.displayedTitle,
+        language: editions.language,
+        publisher: editions.publisher,
+        publicationDate: editions.publicationDate,
+        format: editions.format,
+        progressUnit: editions.progressUnit,
+        coverUrl: editions.coverUrl,
+        editionLength: editions.editionLength,
+      })
+      .from(editions)
+      .innerJoin(editionContents, eq(editionContents.editionId, editions.id))
+      .where(eq(editionContents.workId, workId))
+      .orderBy(asc(editionContents.sortOrder), asc(editions.id));
+  } catch (error) {
+    console.error('Error getting editions for work:', error);
+    throw new Error(`Failed to retrieve editions: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
