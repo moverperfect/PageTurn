@@ -9,6 +9,10 @@ import {
   searchCatalog,
 } from '../../lib/catalog';
 
+if (!Astro.locals.session?.User) {
+  return Astro.redirect('/login');
+}
+
 const query = Astro.url.searchParams.get('q') ?? '';
 let acceptError = '';
 
