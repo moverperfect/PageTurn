@@ -27,10 +27,10 @@ import { v4 as uuidv4 } from 'uuid';
 
 const WORK_SEARCH_LIMIT = 50;
 
-function foldSearchText(value: string): string {
-  // toLowerCase() maps Greek final sigma (ΟΣ → ος) but not a lone Σ → σ.
-  // Fold ς → σ so stored titles and queries share one substring key.
-  return value.normalize('NFC').toLowerCase().replaceAll('ς', 'σ');
+export function foldSearchText(value: string): string {
+  // toLowerCase() maps Greek final sigma (ΟΣ → ος) but not a lone Σ → σ,
+  // and leaves ß distinct from ss. Fold those so caseless keys match.
+  return value.normalize('NFC').toLowerCase().replaceAll('ß', 'ss').replaceAll('ς', 'σ');
 }
 
 /**
@@ -408,6 +408,15 @@ export async function classifyWorkWithSubject(
     await db.insert(workSubjects).values(classification);
     return classification;
   } catch (error) {
+    const db = getDbClient(env);
+    const raced = await db
+      .select()
+      .from(workSubjects)
+      .where(and(eq(workSubjects.workId, workId), eq(workSubjects.subjectId, subjectId)))
+      .limit(1);
+    if (raced[0]) {
+      return raced[0];
+    }
     console.error('Error classifying work:', error);
     throw new Error(`Failed to classify work: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
