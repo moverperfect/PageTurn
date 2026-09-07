@@ -1,7 +1,13 @@
 ---
 import { env } from 'cloudflare:workers';
 import Layout from '../../layouts/Layout.astro';
-import { FORMAT_LABELS, toWorkResource } from '../../lib/catalog';
+import {
+  CatalogNotFoundError,
+  CatalogValidationError,
+  classifyWork,
+  FORMAT_LABELS,
+  loadWorkResource,
+} from '../../lib/catalog';
 import { getEditionsForWork, getWorkById } from '../../lib/db';
 
 const { id } = Astro.params;
@@ -12,7 +18,32 @@ if (!work) {
   Astro.response.status = 404;
 }
 
-const resource = work ? toWorkResource(work) : null;
+let resource = work ? await loadWorkResource(work, env) : null;
+let subjectError = '';
+let subjectForm = { name: '', provenance: '' };
+
+if (resource && Astro.request.method === 'POST') {
+  try {
+    const data = await Astro.request.formData();
+    subjectForm = {
+      name: (data.get('name') as string) || '',
+      provenance: (data.get('provenance') as string) || '',
+    };
+    resource = await classifyWork(
+      resource.id,
+      { name: subjectForm.name, provenance: subjectForm.provenance },
+      env
+    );
+    subjectForm = { name: '', provenance: '' };
+  } catch (error) {
+    if (error instanceof CatalogValidationError || error instanceof CatalogNotFoundError) {
+      subjectError = error.message;
+    } else {
+      console.error('Error classifying Work:', error);
+      subjectError = 'Failed to add Subject. Please try again.';
+    }
+  }
+}
 ---
 
 <Layout title={resource ? `${resource.title} | PageTurn` : 'Work not found | PageTurn'}>
@@ -37,6 +68,64 @@ const resource = work ? toWorkResource(work) : null;
             </dd>
           </div>
         </dl>
+        <section class="mt-8 max-w-2xl">
+          <h2>Subjects</h2>
+          {resource.subjects.length === 0 ? (
+            <p data-field="subjects-empty" class="text-slate-400">
+              This Work has no Subjects.
+            </p>
+          ) : (
+            <ul data-field="subjects" class="mt-4 space-y-2">
+              {resource.subjects.map((subject) => (
+                <li data-subject-id={subject.id}>
+                  <span data-field="subject-name">{subject.name}</span>
+                  {subject.provenance && (
+                    <span class="text-slate-400 text-sm ml-2" data-field="subject-provenance">
+                      {subject.provenance}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {subjectError && (
+            <div
+              class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded my-4"
+              role="alert"
+            >
+              <p>{subjectError}</p>
+            </div>
+          )}
+
+          <form method="POST" class="mt-6 space-y-4">
+            <div>
+              <label for="name" class="form-label">Add Subject</label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                required
+                class="form-input"
+                value={subjectForm.name}
+              />
+            </div>
+            <div>
+              <label for="provenance" class="form-label">
+                Provenance
+                <span class="text-slate-400 font-normal"> (optional)</span>
+              </label>
+              <input
+                type="text"
+                id="provenance"
+                name="provenance"
+                class="form-input"
+                value={subjectForm.provenance}
+              />
+            </div>
+            <button type="submit" class="btn">Add Subject</button>
+          </form>
+        </section>
         <section class="mt-8">
           <div class="flex justify-between items-center mb-4">
             <h2>Editions</h2>

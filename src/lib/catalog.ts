@@ -1,4 +1,13 @@
-import { getWorkById, insertEditionWithContent, insertWork } from './db';
+import {
+  classifyWorkWithSubject,
+  getSubjectClassificationsForWork,
+  getSubjectClassificationsForWorks,
+  getWorkById,
+  insertEditionWithContent,
+  insertSubject,
+  insertWork,
+  type SubjectClassification,
+} from './db';
 import {
   EDITION_FORMATS,
   PROGRESS_UNITS,
@@ -27,6 +36,7 @@ export interface WorkResource {
   id: string;
   title: string;
   firstPublicationDate: string | null;
+  subjects: SubjectClassification[];
 }
 
 export interface EditionContentResource {
@@ -64,12 +74,29 @@ const FORMAT_PROGRESS_UNIT: Record<EditionFormat, ProgressUnit> = {
   audiobook: 'time_position',
 };
 
-export function toWorkResource(work: Work): WorkResource {
+export function toWorkResource(
+  work: Work,
+  subjects: SubjectClassification[] = []
+): WorkResource {
   return {
     id: work.id,
     title: work.title,
     firstPublicationDate: work.firstPublicationDate ?? null,
+    subjects,
   };
+}
+
+export async function loadWorkResource(work: Work, env: Env): Promise<WorkResource> {
+  const subjects = await getSubjectClassificationsForWork(work.id, env);
+  return toWorkResource(work, subjects);
+}
+
+export async function loadWorkResources(works: Work[], env: Env): Promise<WorkResource[]> {
+  const classified = await getSubjectClassificationsForWorks(
+    works.map((work) => work.id),
+    env
+  );
+  return works.map((work) => toWorkResource(work, classified.get(work.id) ?? []));
 }
 
 export function toEditionResource(
@@ -268,4 +295,36 @@ export async function createEdition(
     workId,
     env
   );
+}
+
+function normalizeSubjectName(name: string): string {
+  return name.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function parseSubjectName(value: unknown): { name: string; nameNormalized: string } {
+  if (typeof value !== 'string') {
+    throw new CatalogValidationError('Subject name is required');
+  }
+  const name = value.trim().replace(/\s+/g, ' ');
+  if (!name) {
+    throw new CatalogValidationError('Subject name is required');
+  }
+  return { name, nameNormalized: normalizeSubjectName(name) };
+}
+
+export async function classifyWork(
+  workId: string,
+  input: { name?: unknown; provenance?: unknown },
+  env: Env
+): Promise<WorkResource> {
+  const work = await getWorkById(workId, env);
+  if (!work) {
+    throw new CatalogNotFoundError('Work not found');
+  }
+
+  const { name, nameNormalized } = parseSubjectName(input.name);
+  const provenance = parseOptionalText(input.provenance, 'Provenance');
+  const subject = await insertSubject(name, nameNormalized, env);
+  await classifyWorkWithSubject(work.id, subject.id, provenance, env);
+  return loadWorkResource(work, env);
 }
