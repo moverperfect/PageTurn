@@ -8,6 +8,7 @@ interface __BaseEnv_Env {
 	AUTH_TRUSTED_ORIGINS: "https://pageturn.moverperfect.com";
 	WORKERS_PREVIEW_HOST_SUFFIX: "-pageturn.moverperfect.workers.dev";
 	ACCEPTANCE_TEST_AUTH: string;
+	OPEN_LIBRARY_BASE_URL: string;
 	BETTER_AUTH_SECRET: string;
 	BETTER_AUTH_URL: string;
 	GITHUB_CLIENT_ID: string;

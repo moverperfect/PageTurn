@@ -23,7 +23,10 @@
     "WORKERS_PREVIEW_HOST_SUFFIX": "-pageturn.moverperfect.workers.dev",
     // Set to "true" only by the acceptance harness (scripts/acceptance.mjs) to
     // enable credential sign-in for test fixtures. Never enable in deployments.
-    "ACCEPTANCE_TEST_AUTH": ""
+    "ACCEPTANCE_TEST_AUTH": "",
+    // Override in the acceptance harness to point at a deterministic mock.
+    // Production leaves this empty and the adapter uses https://openlibrary.org.
+    "OPEN_LIBRARY_BASE_URL": ""
   },
 
   /**

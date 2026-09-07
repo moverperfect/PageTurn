@@ -16,6 +16,8 @@ interface WorkResource {
 
 interface WorkListResponse {
   works: WorkResource[];
+  suggestions: unknown[];
+  providerError: boolean;
 }
 
 interface BookResponse {
@@ -236,7 +238,8 @@ describe('sparse Works', () => {
     expect(list.status).toBe(200);
     const found = (await list.json()) as WorkListResponse;
     expect(found.works).toHaveLength(50);
-    expect(found).toEqual({ works: found.works });
+    expect(found.suggestions).toEqual([]);
+    expect(found.providerError).toBe(false);
   });
 
   it('creates a Work from the catalog form without requiring other facts', async () => {

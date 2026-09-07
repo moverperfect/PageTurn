@@ -92,6 +92,13 @@
       "when": 1788771856676,
       "tag": "0012_create_contributors",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1788772529811,
+      "tag": "0013_catalog_provider_cache",
+      "breakpoints": true
     }
   ]
 }

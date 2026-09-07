@@ -26,6 +26,11 @@ import {
   type SubjectClassification,
 } from './db';
 import {
+  CatalogProviderError,
+  searchOpenLibrary,
+  type CatalogSuggestion,
+} from './catalog-provider';
+import {
   CONTRIBUTION_ROLES,
   EDITION_FORMATS,
   IDENTIFIER_NAMESPACES,
@@ -526,7 +531,13 @@ async function worksForIdentifiers(
   return loadWorkResources(works, env);
 }
 
-export async function searchCatalog(query: string, env: Env): Promise<WorkResource[]> {
+export interface CatalogSearchResult {
+  works: WorkResource[];
+  suggestions: CatalogSuggestion[];
+  providerError: boolean;
+}
+
+async function searchLocalCatalog(query: string, env: Env): Promise<WorkResource[]> {
   const needle = query.trim();
   if (needle) {
     const candidates = [
@@ -545,6 +556,35 @@ export async function searchCatalog(query: string, env: Env): Promise<WorkResour
   }
 
   return loadWorkResources(await searchWorks(query, env), env);
+}
+
+export async function searchCatalog(query: string, env: Env): Promise<CatalogSearchResult> {
+  const works = await searchLocalCatalog(query, env);
+  const needle = query.trim();
+  if (!needle) {
+    return { works, suggestions: [], providerError: false };
+  }
+
+  try {
+    const suggestions = await searchOpenLibrary(needle, env);
+    const unseen: CatalogSuggestion[] = [];
+    for (const suggestion of suggestions) {
+      const existing = await findIdentifier(
+        'open_library',
+        normalizeIdentifierValue('open_library', suggestion.workKey),
+        env
+      );
+      if (!existing) {
+        unseen.push(suggestion);
+      }
+    }
+    return { works, suggestions: unseen, providerError: false };
+  } catch (error) {
+    if (error instanceof CatalogProviderError) {
+      return { works, suggestions: [], providerError: true };
+    }
+    throw error;
+  }
 }
 
 function parseContributorName(value: unknown): string {
@@ -624,4 +664,113 @@ export async function removeContribution(id: string, env: Env): Promise<void> {
     throw new CatalogNotFoundError('Contribution not found');
   }
   await deleteContribution(id, env);
+}
+
+function parseSuggestion(value: unknown): CatalogSuggestion {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new CatalogValidationError('A catalog suggestion is required');
+  }
+  const payload = value as Record<string, unknown>;
+  if (payload.provider !== 'open_library') {
+    throw new CatalogValidationError('Unsupported catalog provider');
+  }
+  const workKey = asRequiredText(payload.workKey, 'Work key');
+  const title = asRequiredText(payload.title, 'Title');
+  return {
+    provider: 'open_library',
+    workKey,
+    editionKey: parseOptionalText(payload.editionKey, 'Edition key'),
+    title,
+    authors: Array.isArray(payload.authors)
+      ? payload.authors.flatMap((author) =>
+          typeof author === 'string' && author.trim() ? [author.trim()] : []
+        )
+      : [],
+    firstPublishYear:
+      typeof payload.firstPublishYear === 'number' && Number.isInteger(payload.firstPublishYear)
+        ? payload.firstPublishYear
+        : null,
+    coverUrl: parseOptionalText(payload.coverUrl, 'Cover URL'),
+    isbn13: parseOptionalText(payload.isbn13, 'ISBN-13'),
+  };
+}
+
+function asRequiredText(value: unknown, field: string): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new CatalogValidationError(`${field} is required`);
+  }
+  return value.trim();
+}
+
+export async function acceptCatalogSuggestion(
+  input: unknown,
+  env: Env
+): Promise<{ work: WorkResource; edition: EditionResource }> {
+  const suggestion = parseSuggestion(
+    input !== null && typeof input === 'object' && !Array.isArray(input) && 'suggestion' in input
+      ? (input as { suggestion: unknown }).suggestion
+      : input
+  );
+
+  const existing = await findIdentifier(
+    'open_library',
+    normalizeIdentifierValue('open_library', suggestion.workKey),
+    env
+  );
+  if (existing) {
+    const edition = await getEditionById(existing.editionId, env);
+    if (!edition) {
+      throw new CatalogNotFoundError('Edition not found');
+    }
+    const resource = await loadEditionResource(edition, env);
+    const workId = resource.contents[0]?.workId;
+    const work = workId ? await getWorkById(workId, env) : undefined;
+    if (!work) {
+      throw new CatalogNotFoundError('Work not found');
+    }
+    return { work: await loadWorkResource(work, env), edition: resource };
+  }
+
+  const work = await createWork({ title: suggestion.title }, env);
+  for (const author of suggestion.authors) {
+    await creditWork(work.id, { name: author, role: 'author' }, env);
+  }
+
+  const { edition } = await createEdition(
+    {
+      workId: work.id,
+      displayedTitle: suggestion.title,
+      format: 'print',
+      progressUnit: 'page',
+      coverUrl: suggestion.coverUrl,
+    },
+    env
+  );
+
+  await assignEditionIdentifier(edition.id, {
+    namespace: 'open_library',
+    value: suggestion.workKey,
+    provenance: 'open_library',
+  }, env);
+
+  if (suggestion.isbn13) {
+    await assignEditionIdentifier(edition.id, {
+      namespace: 'isbn_13',
+      value: suggestion.isbn13,
+      provenance: 'open_library',
+    }, env);
+  }
+
+  if (suggestion.editionKey) {
+    await assignEditionIdentifier(edition.id, {
+      namespace: 'open_library',
+      value: suggestion.editionKey,
+      provenance: 'open_library',
+    }, env);
+  }
+
+  return {
+    work: await loadWorkResource(work, env),
+    edition: await loadEditionResource(edition, env),
+  };
 }
