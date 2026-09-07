@@ -21,6 +21,27 @@ interface BookResponse {
   title: string;
 }
 
+describe('sparse Works unauthenticated', () => {
+  it('rejects catalog mutation without a session', async () => {
+    const response = await request('/api/works', {
+      method: 'POST',
+      body: { title: 'Unauthenticated Work' },
+    });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Unauthorized' });
+  });
+
+  // Run before any fixture sign-up in this file. Local D1 serializes writes,
+  // and GET /works after sign-up can wait out SQLite's 30s busy timeout.
+  it('redirects the catalog pages without a session', async () => {
+    for (const path of ['/works', '/works/new']) {
+      const response = await request(path);
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe('/login');
+    }
+  });
+});
+
 describe('sparse Works', () => {
   let reader: Fixture;
   let otherReader: Fixture;
@@ -35,23 +56,6 @@ describe('sparse Works', () => {
 
   afterAll(() => {
     deleteFixtures([reader, otherReader]);
-  });
-
-  it('rejects catalog mutation without a session', async () => {
-    const response = await request('/api/works', {
-      method: 'POST',
-      body: { title },
-    });
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: 'Unauthorized' });
-  });
-
-  it('redirects the catalog pages without a session', async () => {
-    for (const path of ['/works', '/works/new']) {
-      const response = await request(path);
-      expect(response.status).toBe(302);
-      expect(response.headers.get('location')).toBe('/login');
-    }
   });
 
   it('rejects a Work without a title', async () => {
