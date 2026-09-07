@@ -144,6 +144,64 @@ describe('the user_id cascade rebuild (0006)', () => {
   });
 });
 
+describe('works title_search (0008)', () => {
+  const SEARCH_TAG = '0008_known_lila_cheney';
+
+  function insertWork(db: DatabaseSync, id: string, title: string): void {
+    db.prepare(
+      `INSERT INTO works (id, title, first_publication_date) VALUES (?, ?, NULL)`
+    ).run(id, title);
+  }
+
+  it('backfills a searchable title and indexes it without dropping existing Works', () => {
+    const db = openScratchDatabase();
+    try {
+      const tags = migrationTags();
+      const searchIndex = tags.indexOf(SEARCH_TAG);
+      expect(searchIndex).toBeGreaterThan(0);
+      for (const tag of tags.slice(0, searchIndex)) {
+        applyMigration(db, tag);
+      }
+
+      insertWork(db, 'work-ascii', 'Hello World');
+      insertWork(db, 'work-kept', 'Kept Title');
+      // SQLite lower() folds ASCII only. D1 SQL cannot NFC-normalize.
+      insertWork(db, 'work-accent', 'Éclair');
+
+      applyMigration(db, SEARCH_TAG);
+
+      const rows = db
+        .prepare('SELECT id, title, title_search FROM works ORDER BY id')
+        .all() as { id: string; title: string; title_search: string }[];
+      expect(rows).toEqual([
+        { id: 'work-accent', title: 'Éclair', title_search: 'Éclair' },
+        { id: 'work-ascii', title: 'Hello World', title_search: 'hello world' },
+        { id: 'work-kept', title: 'Kept Title', title_search: 'kept title' },
+      ]);
+
+      const indexes = db
+        .prepare(
+          `SELECT name FROM sqlite_master
+           WHERE type = 'index' AND tbl_name = 'works'
+           AND name NOT LIKE 'sqlite_%' ORDER BY name`
+        )
+        .all()
+        .map((row) => (row as { name: string }).name);
+      expect(indexes).toEqual(['works_title_idx', 'works_title_search_idx']);
+
+      db.prepare(
+        `INSERT INTO works (id, title, title_search, first_publication_date)
+         VALUES ('work-new', 'New Title', 'new title', NULL)`
+      ).run();
+      expect(
+        db.prepare('SELECT title_search FROM works WHERE id = ?').get('work-new')
+      ).toEqual({ title_search: 'new title' });
+    } finally {
+      db.close();
+    }
+  });
+});
+
 describe('Reader deletion', () => {
   it('cascades to the `books` and `reading_sessions` rows the Reader owns', () => {
     const db = openMigratedDatabase();

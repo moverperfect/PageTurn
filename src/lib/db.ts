@@ -1,8 +1,88 @@
 // Types for our book and reading session data
-import { eq, and, sql, inArray } from 'drizzle-orm';
+import { eq, and, sql, inArray, asc } from 'drizzle-orm';
 import { getDbClient } from './db-client';
-import { books, readingSessions, type Book, type ReadingSession } from './schema';
+import { books, readingSessions, works, type Book, type ReadingSession, type Work } from './schema';
 import { v4 as uuidv4 } from 'uuid';
+
+const WORK_SEARCH_LIMIT = 50;
+
+function foldSearchText(value: string): string {
+  // toLowerCase() maps Greek final sigma (ΟΣ → ος) but not a lone Σ → σ.
+  // Fold ς → σ so stored titles and queries share one substring key.
+  return value.normalize('NFC').toLowerCase().replaceAll('ς', 'σ');
+}
+
+/**
+ * Inserts a Work and returns the persisted record with a generated ID.
+ *
+ * Persists `titleSearch` as the NFC-normalized, lowercased title (with final
+ * sigma folded to σ) so catalog search can filter in D1 without loading the
+ * full table.
+ */
+export async function insertWork(workData: Omit<Work, 'id' | 'titleSearch'>, env: Env): Promise<Work> {
+  const newWork: Work = {
+    ...workData,
+    id: uuidv4(),
+    titleSearch: foldSearchText(workData.title),
+  };
+
+  try {
+    const db = getDbClient(env);
+    await db.insert(works).values(newWork);
+    return newWork;
+  } catch (error) {
+    console.error('Error adding work:', error);
+    throw new Error(`Failed to add work: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Retrieves a Work by its unique ID.
+ */
+export async function getWorkById(id: string, env: Env): Promise<Work | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db.select().from(works).where(eq(works.id, id)).limit(1);
+    return results[0];
+  } catch (error) {
+    console.error('Error getting work by ID:', error);
+    throw new Error(`Failed to retrieve work: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Searches locally stored Works by title substring.
+ *
+ * Matching uses the persisted NFC-lowercase `titleSearch` key (final sigma
+ * folded to σ) so D1 can filter without SQLite `lower()` or loading the full
+ * catalog into the Worker. D1 rejects LIKE patterns longer than 50 characters,
+ * so substring matching uses `instr` instead of `LIKE`. A btree cannot serve
+ * substring `instr`; FTS5 is follow-on. An empty query returns a title-ordered
+ * page rather than every row. Results are always bounded with LIMIT 50.
+ */
+export async function searchWorks(query: string, env: Env): Promise<Work[]> {
+  try {
+    const db = getDbClient(env);
+    const needle = foldSearchText(query.trim());
+    if (!needle) {
+      return await db
+        .select()
+        .from(works)
+        .orderBy(asc(works.title))
+        .limit(WORK_SEARCH_LIMIT);
+    }
+
+    return await db
+      .select()
+      .from(works)
+      .where(sql`instr(${works.titleSearch}, ${needle}) > 0`)
+      .orderBy(asc(works.title))
+      .limit(WORK_SEARCH_LIMIT);
+  } catch (error) {
+    console.error('Error searching works:', error);
+    throw new Error(`Failed to search works: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
 
 /**
  * Calculates reading progress statistics for a book based on its reading sessions.

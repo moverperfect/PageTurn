@@ -1,0 +1,56 @@
+---
+import { env } from 'cloudflare:workers';
+import Layout from '../../layouts/Layout.astro';
+import { toWorkResource } from '../../lib/catalog';
+import { getWorkById } from '../../lib/db';
+
+const { id } = Astro.params;
+const work = id ? await getWorkById(id, env) : undefined;
+
+if (!work) {
+  Astro.response.status = 404;
+}
+
+const resource = work ? toWorkResource(work) : null;
+---
+
+<Layout title={resource ? `${resource.title} | PageTurn` : 'Work not found | PageTurn'}>
+  {
+    resource ? (
+      <div>
+        <p class="mb-4">
+          <a href="/works">Back to catalog</a>
+        </p>
+        <h1>{resource.title}</h1>
+        <dl class="card max-w-2xl space-y-4">
+          <div>
+            <dt class="text-sm text-slate-400">Title</dt>
+            <dd data-field="title" class="text-lg">
+              {resource.title}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">First publication date</dt>
+            <dd data-field="first-publication-date">
+              {resource.firstPublicationDate ?? 'Unknown'}
+            </dd>
+          </div>
+        </dl>
+        <section class="mt-8">
+          <h2>Editions</h2>
+          <p data-field="editions-empty" class="text-slate-400">
+            This Work has no Editions yet.
+          </p>
+        </section>
+      </div>
+    ) : (
+      <div class="card text-center py-12">
+        <h1>Work not found</h1>
+        <p class="mb-6">That Work is not in the local catalog.</p>
+        <a href="/works" class="btn">
+          Back to catalog
+        </a>
+      </div>
+    )
+  }
+</Layout>
