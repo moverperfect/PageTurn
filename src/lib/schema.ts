@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const EDITION_FORMATS = ['print', 'ebook', 'audiobook'] as const;
 export type EditionFormat = (typeof EDITION_FORMATS)[number];
@@ -42,6 +42,28 @@ export const editionContents = sqliteTable('edition_contents', {
 }, (table) => [
   index('edition_contents_edition_id_idx').on(table.editionId),
   index('edition_contents_work_id_idx').on(table.workId),
+]);
+
+export const subjects = sqliteTable('subjects', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  nameNormalized: text('name_normalized').notNull(),
+}, (table) => [
+  uniqueIndex('subjects_name_normalized_uidx').on(table.nameNormalized),
+]);
+
+export const workSubjects = sqliteTable('work_subjects', {
+  id: text('id').primaryKey(),
+  workId: text('work_id')
+    .notNull()
+    .references(() => works.id, { onDelete: 'cascade' }),
+  subjectId: text('subject_id')
+    .notNull()
+    .references(() => subjects.id),
+  provenance: text('provenance'),
+}, (table) => [
+  uniqueIndex('work_subjects_work_subject_uidx').on(table.workId, table.subjectId),
+  index('work_subjects_subject_id_idx').on(table.subjectId),
 ]);
 
 export const books = sqliteTable('books', {
@@ -156,6 +178,10 @@ export type Edition = typeof editions.$inferSelect;
 export type NewEdition = typeof editions.$inferInsert;
 export type EditionContent = typeof editionContents.$inferSelect;
 export type NewEditionContent = typeof editionContents.$inferInsert;
+export type Subject = typeof subjects.$inferSelect;
+export type NewSubject = typeof subjects.$inferInsert;
+export type WorkSubject = typeof workSubjects.$inferSelect;
+export type NewWorkSubject = typeof workSubjects.$inferInsert;
 
 // Types for our book and reading session data
 export type Book = typeof books.$inferSelect;

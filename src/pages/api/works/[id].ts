@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 import type { APIRoute } from 'astro';
-import { toWorkResource } from '../../../lib/catalog';
+import { loadWorkResource } from '../../../lib/catalog';
 import { getWorkById } from '../../../lib/db';
 import {
   getAuthenticatedUserId,
@@ -23,5 +23,5 @@ export const GET: APIRoute = async ({ params, locals }) => {
     return jsonResponse({ error: 'Work not found' }, 404);
   }
 
-  return jsonResponse(toWorkResource(work));
+  return jsonResponse(await loadWorkResource(work, env));
 };
