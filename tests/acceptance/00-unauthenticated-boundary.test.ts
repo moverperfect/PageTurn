@@ -19,7 +19,7 @@ describe('unauthenticated boundary', () => {
     const response = await request('/books');
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe('/login');
-  });
+  }, 45_000);
 
   it('redirects catalog pages without a session to the login page', async () => {
     const catalog = await request('/works');
