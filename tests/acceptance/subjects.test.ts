@@ -146,6 +146,60 @@ describe('provenanced Subjects', () => {
     ]);
   });
 
+  it('reuses Subjects that differ only by Unicode case folding', async () => {
+    const created = await request('/api/works', {
+      method: 'POST',
+      cookie: reader.cookie,
+      body: { title: `Folded Subject ${crypto.randomUUID()}` },
+    });
+    expect(created.status).toBe(201);
+    const foldWork = (await created.json()) as WorkResource;
+
+    const sigma = await request(`/api/works/${foldWork.id}/subjects`, {
+      method: 'POST',
+      cookie: reader.cookie,
+      body: { name: 'ΟΣ', provenance: 'reader' },
+    });
+    expect(sigma.status).toBe(201);
+    const afterSigma = (await sigma.json()) as WorkResource;
+    expect(afterSigma.subjects).toHaveLength(1);
+
+    const sigmaVariant = await request(`/api/works/${foldWork.id}/subjects`, {
+      method: 'POST',
+      cookie: reader.cookie,
+      body: { name: 'οσ', provenance: 'ignored' },
+    });
+    expect(sigmaVariant.status).toBe(201);
+    const afterSigmaVariant = (await sigmaVariant.json()) as WorkResource;
+    expect(afterSigmaVariant.subjects).toHaveLength(1);
+    expect(afterSigmaVariant.subjects[0].id).toBe(afterSigma.subjects[0].id);
+    expect(afterSigmaVariant.subjects[0].name).toBe('ΟΣ');
+
+    const sharpS = await request(`/api/works/${foldWork.id}/subjects`, {
+      method: 'POST',
+      cookie: reader.cookie,
+      body: { name: 'Straße', provenance: 'reader' },
+    });
+    expect(sharpS.status).toBe(201);
+    const afterSharpS = (await sharpS.json()) as WorkResource;
+    const street = afterSharpS.subjects.find((subject) => subject.name === 'Straße');
+    expect(street).toBeTruthy();
+
+    const ssVariant = await request(`/api/works/${foldWork.id}/subjects`, {
+      method: 'POST',
+      cookie: reader.cookie,
+      body: { name: 'STRASSE', provenance: 'ignored' },
+    });
+    expect(ssVariant.status).toBe(201);
+    const afterSs = (await ssVariant.json()) as WorkResource;
+    const streets = afterSs.subjects.filter(
+      (subject) => subject.name === 'Straße' || subject.name === 'STRASSE'
+    );
+    expect(streets).toHaveLength(1);
+    expect(streets[0].id).toBe(street?.id);
+    expect(streets[0].name).toBe('Straße');
+  });
+
   it('exposes Subjects on Work search and detail without treating them as Edition metadata', async () => {
     const search = await request(`/api/works?q=${encodeURIComponent(title)}`, {
       cookie: otherReader.cookie,
