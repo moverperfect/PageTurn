@@ -21,6 +21,7 @@ export interface CatalogSuggestion {
 const USER_AGENT = 'PageTurn/0.0.1 (https://github.com/moverperfect/PageTurn)';
 const DEFAULT_PROVIDER_BASE = 'https://openlibrary.org';
 const SEARCH_LIMIT = 5;
+const FETCH_TIMEOUT_MS = 5_000;
 
 export function providerBaseUrl(env: Env): string {
   const configured = env.OPEN_LIBRARY_BASE_URL?.trim();
@@ -37,8 +38,28 @@ interface OpenLibrarySearchDoc {
   isbn?: unknown;
 }
 
-interface OpenLibrarySearchResponse {
-  docs?: OpenLibrarySearchDoc[];
+function parseCachedSuggestions(cached: string): CatalogSuggestion[] | null {
+  try {
+    const parsed: unknown = JSON.parse(cached);
+    return Array.isArray(parsed) ? (parsed as CatalogSuggestion[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseSearchDocs(body: unknown): OpenLibrarySearchDoc[] {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new CatalogProviderError('Open Library is unavailable');
+  }
+  if (!('docs' in body) || body.docs === undefined || body.docs === null) {
+    return [];
+  }
+  if (!Array.isArray(body.docs)) {
+    throw new CatalogProviderError('Open Library is unavailable');
+  }
+  return body.docs.flatMap((doc) =>
+    doc && typeof doc === 'object' && !Array.isArray(doc) ? [doc as OpenLibrarySearchDoc] : []
+  );
 }
 
 function asString(value: unknown): string | null {
@@ -96,7 +117,10 @@ export async function searchOpenLibrary(
   const cacheKey = `ol:search:${needle.toLowerCase()}`;
   const cached = await getProviderCache(cacheKey, env);
   if (cached) {
-    return JSON.parse(cached) as CatalogSuggestion[];
+    const suggestions = parseCachedSuggestions(cached);
+    if (suggestions) {
+      return suggestions;
+    }
   }
 
   const url = `${providerBaseUrl(env)}/search.json?q=${encodeURIComponent(needle)}&limit=${SEARCH_LIMIT}`;
@@ -107,6 +131,7 @@ export async function searchOpenLibrary(
         Accept: 'application/json',
         'User-Agent': USER_AGENT,
       },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
   } catch {
     throw new CatalogProviderError('Open Library is unavailable');
@@ -116,8 +141,14 @@ export async function searchOpenLibrary(
     throw new CatalogProviderError('Open Library is unavailable');
   }
 
-  const body = (await response.json()) as OpenLibrarySearchResponse;
-  const suggestions = (body.docs ?? [])
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new CatalogProviderError('Open Library is unavailable');
+  }
+
+  const suggestions = parseSearchDocs(body)
     .map(toSuggestion)
     .flatMap((suggestion) => (suggestion ? [suggestion] : []));
   await setProviderCache(cacheKey, JSON.stringify(suggestions), env);

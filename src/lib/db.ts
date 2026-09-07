@@ -1,5 +1,5 @@
 // Types for our book and reading session data
-import { eq, and, sql, inArray, asc } from 'drizzle-orm';
+import { eq, and, sql, inArray, asc, lt } from 'drizzle-orm';
 import { getDbClient } from './db-client';
 import {
   books,
@@ -613,6 +613,7 @@ export async function getProviderCache(
       return null;
     }
     if (Math.floor(Date.now() / 1000) - row.fetchedAt > PROVIDER_CACHE_TTL_SECONDS) {
+      await db.delete(catalogProviderCache).where(eq(catalogProviderCache.cacheKey, cacheKey));
       return null;
     }
     return row.payload;
@@ -630,6 +631,9 @@ export async function setProviderCache(
   try {
     const db = getDbClient(env);
     const fetchedAt = Math.floor(Date.now() / 1000);
+    await db
+      .delete(catalogProviderCache)
+      .where(lt(catalogProviderCache.fetchedAt, fetchedAt - PROVIDER_CACHE_TTL_SECONDS));
     await db
       .insert(catalogProviderCache)
       .values({ cacheKey, payload, fetchedAt })
