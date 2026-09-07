@@ -6,13 +6,15 @@ import {
   CatalogConflictError,
   CatalogNotFoundError,
   CatalogValidationError,
+  creditEdition,
   FORMAT_LABELS,
   loadEditionResource,
   NAMESPACE_LABELS,
   PROGRESS_UNIT_LABELS,
+  ROLE_LABELS,
   toWorkResource,
 } from '../../lib/catalog';
-import { IDENTIFIER_NAMESPACES } from '../../lib/schema';
+import { CONTRIBUTION_ROLES, IDENTIFIER_NAMESPACES } from '../../lib/schema';
 import { getEditionById, getEditionContents, getWorkById } from '../../lib/db';
 
 if (!Astro.locals.session?.User) {
@@ -34,24 +36,47 @@ let resource = edition ? await loadEditionResource(edition, env) : null;
 const workResources = works.flatMap((work) => (work ? [toWorkResource(work)] : []));
 let identifierError = '';
 let identifierForm = { namespace: '', value: '', provenance: '' };
+let creditError = '';
+let creditForm = { name: '', role: '' };
 
 if (resource && Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const intent = (data.get('intent') as string) || 'identifier';
   try {
-    const data = await Astro.request.formData();
-    identifierForm = {
-      namespace: (data.get('namespace') as string) || '',
-      value: (data.get('value') as string) || '',
-      provenance: (data.get('provenance') as string) || '',
-    };
-    resource = await assignEditionIdentifier(resource.id, identifierForm, env);
-    identifierForm = { namespace: '', value: '', provenance: '' };
+    if (intent === 'contribution') {
+      creditForm = {
+        name: (data.get('name') as string) || '',
+        role: (data.get('role') as string) || '',
+      };
+      resource = await creditEdition(
+        resource.id,
+        { name: creditForm.name, role: creditForm.role },
+        env
+      );
+      creditForm = { name: '', role: '' };
+    } else {
+      identifierForm = {
+        namespace: (data.get('namespace') as string) || '',
+        value: (data.get('value') as string) || '',
+        provenance: (data.get('provenance') as string) || '',
+      };
+      resource = await assignEditionIdentifier(resource.id, identifierForm, env);
+      identifierForm = { namespace: '', value: '', provenance: '' };
+    }
   } catch (error) {
     if (
       error instanceof CatalogValidationError ||
       error instanceof CatalogNotFoundError ||
       error instanceof CatalogConflictError
     ) {
-      identifierError = error.message;
+      if (intent === 'contribution') {
+        creditError = error.message;
+      } else {
+        identifierError = error.message;
+      }
+    } else if (intent === 'contribution') {
+      console.error('Error crediting Edition:', error);
+      creditError = 'Failed to add Contribution. Please try again.';
     } else {
       console.error('Error assigning identifier:', error);
       identifierError = 'Failed to add identifier. Please try again.';
@@ -158,6 +183,7 @@ if (resource && Astro.request.method === 'POST') {
           )}
 
           <form method="POST" class="mt-6 space-y-4">
+            <input type="hidden" name="intent" value="identifier" />
             <div>
               <label for="namespace" class="form-label">Namespace</label>
               <select id="namespace" name="namespace" required class="form-input">
@@ -199,6 +225,63 @@ if (resource && Astro.request.method === 'POST') {
               />
             </div>
             <button type="submit" class="btn">Add identifier</button>
+          </form>
+        </section>
+        <section class="mt-8 max-w-2xl" data-field="edition-credits">
+          <h2>Contributions</h2>
+          {resource.contributions.length === 0 ? (
+            <p data-field="edition-credits-empty" class="text-slate-400">
+              This Edition has no Contributions.
+            </p>
+          ) : (
+            <ul data-field="edition-credits-list" class="mt-4 space-y-2">
+              {resource.contributions.map((credit) => (
+                <li data-contribution-id={credit.id}>
+                  <span data-field="contributor-name">{credit.contributor.name}</span>
+                  <span class="text-slate-400 text-sm ml-2" data-field="contributor-role">
+                    {ROLE_LABELS[credit.role]}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {creditError && (
+            <div
+              class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded my-4"
+              role="alert"
+            >
+              <p>{creditError}</p>
+            </div>
+          )}
+
+          <form method="POST" class="mt-6 space-y-4">
+            <input type="hidden" name="intent" value="contribution" />
+            <div>
+              <label for="contributor-name" class="form-label">Contributor</label>
+              <input
+                type="text"
+                id="contributor-name"
+                name="name"
+                required
+                class="form-input"
+                value={creditForm.name}
+              />
+            </div>
+            <div>
+              <label for="edition-role" class="form-label">Role</label>
+              <select id="edition-role" name="role" required class="form-input">
+                <option value="" selected={creditForm.role === ''}>
+                  Select a role
+                </option>
+                {CONTRIBUTION_ROLES.map((role) => (
+                  <option value={role} selected={creditForm.role === role}>
+                    {ROLE_LABELS[role]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" class="btn">Add Contribution</button>
           </form>
         </section>
         <section class="mt-8">

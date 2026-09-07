@@ -15,6 +15,15 @@ export const IDENTIFIER_NAMESPACES = [
 ] as const;
 export type IdentifierNamespace = (typeof IDENTIFIER_NAMESPACES)[number];
 
+export const CONTRIBUTION_ROLES = [
+  'author',
+  'editor',
+  'translator',
+  'illustrator',
+  'narrator',
+] as const;
+export type ContributionRole = (typeof CONTRIBUTION_ROLES)[number];
+
 export const works = sqliteTable('works', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
@@ -90,6 +99,28 @@ export const workSubjects = sqliteTable('work_subjects', {
 }, (table) => [
   uniqueIndex('work_subjects_work_subject_uidx').on(table.workId, table.subjectId),
   index('work_subjects_subject_id_idx').on(table.subjectId),
+]);
+
+export const contributors = sqliteTable('contributors', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  nameSearch: text('name_search').notNull(),
+}, (table) => [
+  uniqueIndex('contributors_name_search_uidx').on(table.nameSearch),
+]);
+
+export const contributions = sqliteTable('contributions', {
+  id: text('id').primaryKey(),
+  contributorId: text('contributor_id')
+    .notNull()
+    .references(() => contributors.id),
+  workId: text('work_id').references(() => works.id, { onDelete: 'cascade' }),
+  editionId: text('edition_id').references(() => editions.id, { onDelete: 'cascade' }),
+  role: text('role', { enum: CONTRIBUTION_ROLES }).notNull(),
+}, (table) => [
+  index('contributions_contributor_id_idx').on(table.contributorId),
+  index('contributions_work_id_idx').on(table.workId),
+  index('contributions_edition_id_idx').on(table.editionId),
 ]);
 
 export const books = sqliteTable('books', {
@@ -210,6 +241,10 @@ export type Subject = typeof subjects.$inferSelect;
 export type NewSubject = typeof subjects.$inferInsert;
 export type WorkSubject = typeof workSubjects.$inferSelect;
 export type NewWorkSubject = typeof workSubjects.$inferInsert;
+export type Contributor = typeof contributors.$inferSelect;
+export type NewContributor = typeof contributors.$inferInsert;
+export type Contribution = typeof contributions.$inferSelect;
+export type NewContribution = typeof contributions.$inferInsert;
 
 // Types for our book and reading session data
 export type Book = typeof books.$inferSelect;

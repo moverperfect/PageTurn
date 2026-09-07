@@ -2,24 +2,32 @@ import {
   classifyWorkWithSubject,
   findIdentifier,
   findIdentifiersByNormalizedValue,
+  getCreditsForEdition,
+  getCreditsForWork,
   getEditionById,
   getEditionContents,
   getIdentifiersForEdition,
   getSubjectClassificationsForWork,
-  getSubjectClassificationsForWorks,
   getWorkById,
   IdentifierConflictError,
   insertEditionIdentifier,
   insertEditionWithContent,
+  deleteContribution,
+  getContributionById,
+  insertContribution,
+  insertContributor,
   insertSubject,
   insertWork,
   searchWorks,
+  type ContributionCredit,
   type SubjectClassification,
 } from './db';
 import {
+  CONTRIBUTION_ROLES,
   EDITION_FORMATS,
   IDENTIFIER_NAMESPACES,
   PROGRESS_UNITS,
+  type ContributionRole,
   type Edition,
   type EditionContent,
   type EditionFormat,
@@ -55,6 +63,7 @@ export interface WorkResource {
   title: string;
   firstPublicationDate: string | null;
   subjects: SubjectClassification[];
+  contributions: ContributionCredit[];
 }
 
 export interface EditionContentResource {
@@ -80,7 +89,16 @@ export interface EditionResource {
   editionLength: number | null;
   contents: EditionContentResource[];
   identifiers: EditionIdentifierResource[];
+  contributions: ContributionCredit[];
 }
+
+export const ROLE_LABELS: Record<ContributionRole, string> = {
+  author: 'Author',
+  editor: 'Editor',
+  translator: 'Translator',
+  illustrator: 'Illustrator',
+  narrator: 'Narrator',
+};
 
 export const NAMESPACE_LABELS: Record<IdentifierNamespace, string> = {
   isbn_10: 'ISBN-10',
@@ -109,33 +127,35 @@ const FORMAT_PROGRESS_UNIT: Record<EditionFormat, ProgressUnit> = {
 
 export function toWorkResource(
   work: Work,
-  subjects: SubjectClassification[] = []
+  subjects: SubjectClassification[] = [],
+  contributions: ContributionCredit[] = []
 ): WorkResource {
   return {
     id: work.id,
     title: work.title,
     firstPublicationDate: work.firstPublicationDate ?? null,
     subjects,
+    contributions,
   };
 }
 
 export async function loadWorkResource(work: Work, env: Env): Promise<WorkResource> {
-  const subjects = await getSubjectClassificationsForWork(work.id, env);
-  return toWorkResource(work, subjects);
+  const [subjects, contributions] = await Promise.all([
+    getSubjectClassificationsForWork(work.id, env),
+    getCreditsForWork(work.id, env),
+  ]);
+  return toWorkResource(work, subjects, contributions);
 }
 
 export async function loadWorkResources(works: Work[], env: Env): Promise<WorkResource[]> {
-  const classified = await getSubjectClassificationsForWorks(
-    works.map((work) => work.id),
-    env
-  );
-  return works.map((work) => toWorkResource(work, classified.get(work.id) ?? []));
+  return Promise.all(works.map((work) => loadWorkResource(work, env)));
 }
 
 export function toEditionResource(
   edition: Edition,
   contents: EditionContent[],
-  identifiers: EditionIdentifier[] = []
+  identifiers: EditionIdentifier[] = [],
+  contributions: ContributionCredit[] = []
 ): EditionResource {
   return {
     id: edition.id,
@@ -159,15 +179,17 @@ export function toEditionResource(
       value: identifier.value,
       provenance: identifier.provenance ?? null,
     })),
+    contributions,
   };
 }
 
 export async function loadEditionResource(edition: Edition, env: Env): Promise<EditionResource> {
-  const [contents, identifiers] = await Promise.all([
+  const [contents, identifiers, contributions] = await Promise.all([
     getEditionContents(edition.id, env),
     getIdentifiersForEdition(edition.id, env),
+    getCreditsForEdition(edition.id, env),
   ]);
-  return toEditionResource(edition, contents, identifiers);
+  return toEditionResource(edition, contents, identifiers, contributions);
 }
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -513,4 +535,79 @@ export async function searchCatalog(query: string, env: Env): Promise<WorkResour
   }
 
   return loadWorkResources(await searchWorks(query, env), env);
+}
+
+function parseContributorName(value: unknown): string {
+  if (typeof value !== 'string') {
+    throw new CatalogValidationError('Contributor name is required');
+  }
+  const name = value.trim().replace(/\s+/g, ' ');
+  if (!name) {
+    throw new CatalogValidationError('Contributor name is required');
+  }
+  return name;
+}
+
+function parseRole(value: unknown): ContributionRole {
+  if (value === undefined || value === null || value === '') {
+    throw new CatalogValidationError('Contribution role is required');
+  }
+  if (typeof value !== 'string' || !CONTRIBUTION_ROLES.includes(value as ContributionRole)) {
+    throw new CatalogValidationError(
+      'Contribution role must be author, editor, translator, illustrator, or narrator'
+    );
+  }
+  return value as ContributionRole;
+}
+
+export async function creditWork(
+  workId: string,
+  input: { name?: unknown; role?: unknown },
+  env: Env
+): Promise<WorkResource> {
+  const work = await getWorkById(workId, env);
+  if (!work) {
+    throw new CatalogNotFoundError('Work not found');
+  }
+  const contributor = await insertContributor(parseContributorName(input.name), env);
+  await insertContribution(
+    {
+      contributorId: contributor.id,
+      workId: work.id,
+      editionId: null,
+      role: parseRole(input.role),
+    },
+    env
+  );
+  return loadWorkResource(work, env);
+}
+
+export async function creditEdition(
+  editionId: string,
+  input: { name?: unknown; role?: unknown },
+  env: Env
+): Promise<EditionResource> {
+  const edition = await getEditionById(editionId, env);
+  if (!edition) {
+    throw new CatalogNotFoundError('Edition not found');
+  }
+  const contributor = await insertContributor(parseContributorName(input.name), env);
+  await insertContribution(
+    {
+      contributorId: contributor.id,
+      workId: null,
+      editionId: edition.id,
+      role: parseRole(input.role),
+    },
+    env
+  );
+  return loadEditionResource(edition, env);
+}
+
+export async function removeContribution(id: string, env: Env): Promise<void> {
+  const contribution = await getContributionById(id, env);
+  if (!contribution) {
+    throw new CatalogNotFoundError('Contribution not found');
+  }
+  await deleteContribution(id, env);
 }

@@ -11,6 +11,7 @@ interface WorkResource {
   title: string;
   firstPublicationDate: string | null;
   subjects: { id: string; name: string; provenance: string | null }[];
+  contributions: unknown[];
 }
 
 interface WorkListResponse {
@@ -71,6 +72,7 @@ describe('sparse Works', () => {
       title,
       firstPublicationDate: null,
       subjects: [],
+      contributions: [],
     });
   });
 
@@ -93,6 +95,7 @@ describe('sparse Works', () => {
       title,
       firstPublicationDate: null,
       subjects: [],
+      contributions: [],
     });
   });
 

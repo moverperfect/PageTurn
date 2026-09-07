@@ -139,6 +139,7 @@ describe('create Editions for a Work', () => {
       editionLength: null,
       contents: [{ workId: work.id, sortOrder: 0 }],
       identifiers: [],
+      contributions: [],
     });
   });
 
