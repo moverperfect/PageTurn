@@ -10,6 +10,10 @@ import {
 } from '../../lib/catalog';
 import { getEditionsForWork, getWorkById } from '../../lib/db';
 
+if (!Astro.locals.session?.User) {
+  return Astro.redirect('/login');
+}
+
 const { id } = Astro.params;
 const work = id ? await getWorkById(id, env) : undefined;
 const editions = work ? await getEditionsForWork(work.id, env) : [];

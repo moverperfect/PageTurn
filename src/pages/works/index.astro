@@ -4,6 +4,10 @@ import Layout from '../../layouts/Layout.astro';
 import { loadWorkResources } from '../../lib/catalog';
 import { searchWorks } from '../../lib/db';
 
+if (!Astro.locals.session?.User) {
+  return Astro.redirect('/login');
+}
+
 const query = Astro.url.searchParams.get('q') ?? '';
 const works = await loadWorkResources(await searchWorks(query, env), env);
 ---
