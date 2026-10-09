@@ -1,0 +1,238 @@
+---
+import { env } from 'cloudflare:workers';
+import Layout from '../../../../layouts/Layout.astro';
+import {
+  CatalogNotFoundError,
+  CatalogValidationError,
+  createEdition,
+  FORMAT_LABELS,
+  PROGRESS_UNIT_LABELS,
+  toWorkResource,
+} from '../../../../lib/catalog';
+import { EDITION_FORMATS, PROGRESS_UNITS } from '../../../../lib/schema';
+import { getWorkById } from '../../../../lib/db';
+
+if (!Astro.locals.session?.User) {
+  return Astro.redirect('/login');
+}
+
+const { id: workId } = Astro.params;
+const work = workId ? await getWorkById(workId, env) : undefined;
+
+if (!work) {
+  Astro.response.status = 404;
+}
+
+const resource = work ? toWorkResource(work) : null;
+
+let errorMessage = '';
+let formData = {
+  displayedTitle: '',
+  language: '',
+  publisher: '',
+  publicationDate: '',
+  format: '',
+  progressUnit: '',
+  coverUrl: '',
+  editionLength: '',
+};
+
+if (resource && Astro.request.method === 'POST') {
+  try {
+    const data = await Astro.request.formData();
+    formData = {
+      displayedTitle: (data.get('displayedTitle') as string) || '',
+      language: (data.get('language') as string) || '',
+      publisher: (data.get('publisher') as string) || '',
+      publicationDate: (data.get('publicationDate') as string) || '',
+      format: (data.get('format') as string) || '',
+      progressUnit: (data.get('progressUnit') as string) || '',
+      coverUrl: (data.get('coverUrl') as string) || '',
+      editionLength: (data.get('editionLength') as string) || '',
+    };
+
+    const { edition } = await createEdition(
+      {
+        workId: resource.id,
+        ...formData,
+      },
+      env
+    );
+    return Astro.redirect(`/editions/${edition.id}`);
+  } catch (error) {
+    if (error instanceof CatalogValidationError || error instanceof CatalogNotFoundError) {
+      errorMessage = error.message;
+    } else {
+      console.error('Error creating Edition:', error);
+      errorMessage = 'Failed to create Edition. Please try again.';
+    }
+  }
+}
+---
+
+<Layout title={resource ? `Create Edition of ${resource.title} | PageTurn` : 'Work not found | PageTurn'}>
+  {
+    resource ? (
+      <div>
+        <p class="mb-4">
+          <a href={`/works/${resource.id}`}>Back to {resource.title}</a>
+        </p>
+        <h1>Create Edition</h1>
+        <p class="text-slate-300 mb-6 max-w-2xl">
+          An Edition is a published form of {resource.title}. Format and Progress
+          Unit are required. Displayed title, language, publisher, publication
+          date, cover, and length stay unknown until they are known.
+        </p>
+
+        {errorMessage && (
+          <div
+            class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
+            role="alert"
+          >
+            <p>{errorMessage}</p>
+          </div>
+        )}
+
+        <form method="POST" class="max-w-xl mt-6 space-y-6">
+          <div>
+            <label for="format" class="form-label">Format</label>
+            <select id="format" name="format" required class="form-input">
+              <option value="" selected={formData.format === ''}>
+                Select a format
+              </option>
+              {EDITION_FORMATS.map((format) => (
+                <option value={format} selected={formData.format === format}>
+                  {FORMAT_LABELS[format]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label for="progressUnit" class="form-label">Progress Unit</label>
+            <select id="progressUnit" name="progressUnit" required class="form-input">
+              <option value="" selected={formData.progressUnit === ''}>
+                Select a Progress Unit
+              </option>
+              {PROGRESS_UNITS.map((unit) => (
+                <option value={unit} selected={formData.progressUnit === unit}>
+                  {PROGRESS_UNIT_LABELS[unit]}
+                </option>
+              ))}
+            </select>
+            <p class="mt-2 text-sm text-slate-400">
+              Print and e-book Editions use Page. Audiobook Editions use Time
+              Position.
+            </p>
+          </div>
+
+          <div>
+            <label for="displayedTitle" class="form-label">
+              Displayed title
+              <span class="text-slate-400 font-normal"> (optional)</span>
+            </label>
+            <input
+              type="text"
+              id="displayedTitle"
+              name="displayedTitle"
+              class="form-input"
+              value={formData.displayedTitle}
+            />
+          </div>
+
+          <div>
+            <label for="language" class="form-label">
+              Language
+              <span class="text-slate-400 font-normal"> (optional)</span>
+            </label>
+            <input
+              type="text"
+              id="language"
+              name="language"
+              class="form-input"
+              value={formData.language}
+            />
+          </div>
+
+          <div>
+            <label for="publisher" class="form-label">
+              Publisher
+              <span class="text-slate-400 font-normal"> (optional)</span>
+            </label>
+            <input
+              type="text"
+              id="publisher"
+              name="publisher"
+              class="form-input"
+              value={formData.publisher}
+            />
+          </div>
+
+          <div>
+            <label for="publicationDate" class="form-label">
+              Publication date
+              <span class="text-slate-400 font-normal"> (optional)</span>
+            </label>
+            <input
+              type="date"
+              id="publicationDate"
+              name="publicationDate"
+              class="form-input"
+              value={formData.publicationDate}
+            />
+          </div>
+
+          <div>
+            <label for="coverUrl" class="form-label">
+              Cover URL
+              <span class="text-slate-400 font-normal"> (optional)</span>
+            </label>
+            <input
+              type="url"
+              id="coverUrl"
+              name="coverUrl"
+              class="form-input"
+              value={formData.coverUrl}
+            />
+          </div>
+
+          <div>
+            <label for="editionLength" class="form-label">
+              Edition Length
+              <span class="text-slate-400 font-normal"> (optional)</span>
+            </label>
+            <input
+              type="number"
+              id="editionLength"
+              name="editionLength"
+              min="1"
+              class="form-input"
+              value={formData.editionLength}
+            />
+            <p class="mt-2 text-sm text-slate-400">
+              Pages for print and e-book Editions, or Time Position units for
+              audiobooks. Leave blank if unknown.
+            </p>
+          </div>
+
+          <div class="flex justify-end space-x-4 pt-4">
+            <a href={`/works/${resource.id}`} class="btn-secondary">
+              Cancel
+            </a>
+            <button type="submit" class="btn">
+              Create Edition
+            </button>
+          </div>
+        </form>
+      </div>
+    ) : (
+      <div class="card text-center py-12">
+        <h1>Work not found</h1>
+        <p class="mb-6">That Work is not in the local catalog.</p>
+        <a href="/works" class="btn">
+          Back to catalog
+        </a>
+      </div>
+    )
+  }
+</Layout>
