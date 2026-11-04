@@ -37,7 +37,7 @@
     "@types/node": "24.13.6",
     "better-sqlite3": "12.11.1",
     "cross-env": "10.1.0",
-    "drizzle-kit": "0.31.10",
+    "drizzle-kit": "0.31.11",
     "tailwindcss": "4.3.3",
     "ts-node": "10.9.2",
     "typescript": "5.9.3",
