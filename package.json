@@ -29,7 +29,7 @@
     "@types/uuid": "11.0.0",
     "astro": "7.3.8",
     "better-auth": "1.7.17",
-    "drizzle-orm": "0.45.2",
+    "drizzle-orm": "0.45.4",
     "uuid": "14.0.2"
   },
   "devDependencies": {
