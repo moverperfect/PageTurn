@@ -3,6 +3,10 @@ import { env } from 'cloudflare:workers';
 import Layout from '../../layouts/Layout.astro';
 import { CatalogValidationError, createWork } from '../../lib/catalog';
 
+if (!Astro.locals.session?.User) {
+  return Astro.redirect('/login');
+}
+
 let errorMessage = '';
 let formData = {
   title: '',

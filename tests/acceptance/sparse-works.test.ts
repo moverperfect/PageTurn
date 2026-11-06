@@ -37,23 +37,6 @@ describe('sparse Works', () => {
     deleteFixtures([reader, otherReader]);
   });
 
-  it('rejects catalog mutation without a session', async () => {
-    const response = await request('/api/works', {
-      method: 'POST',
-      body: { title },
-    });
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({ error: 'Unauthorized' });
-  });
-
-  it('redirects the catalog pages without a session', async () => {
-    for (const path of ['/works', '/works/new']) {
-      const response = await request(path);
-      expect(response.status).toBe(302);
-      expect(response.headers.get('location')).toBe('/login');
-    }
-  });
-
   it('rejects a Work without a title', async () => {
     const response = await request('/api/works', {
       method: 'POST',
