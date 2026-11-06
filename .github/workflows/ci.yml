@@ -10,7 +10,7 @@ jobs:
     name: Build and acceptance suite
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4.4.0
+      - uses: actions/checkout@v7.0.1
 
       - uses: pnpm/action-setup@v4.4.0
 
