@@ -56,6 +56,7 @@ export async function request(
     headers,
     body,
     redirect: 'manual',
+    credentials: 'omit',
   });
 }
 

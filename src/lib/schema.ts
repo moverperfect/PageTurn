@@ -1,4 +1,28 @@
-import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+
+export const EDITION_FORMATS = ['print', 'ebook', 'audiobook'] as const;
+export type EditionFormat = (typeof EDITION_FORMATS)[number];
+
+export const PROGRESS_UNITS = ['page', 'time_position'] as const;
+export type ProgressUnit = (typeof PROGRESS_UNITS)[number];
+
+export const IDENTIFIER_NAMESPACES = [
+  'isbn_10',
+  'isbn_13',
+  'asin',
+  'oclc',
+  'open_library',
+] as const;
+export type IdentifierNamespace = (typeof IDENTIFIER_NAMESPACES)[number];
+
+export const CONTRIBUTION_ROLES = [
+  'author',
+  'editor',
+  'translator',
+  'illustrator',
+  'narrator',
+] as const;
+export type ContributionRole = (typeof CONTRIBUTION_ROLES)[number];
 
 export const works = sqliteTable('works', {
   id: text('id').primaryKey(),
@@ -9,6 +33,102 @@ export const works = sqliteTable('works', {
   index('works_title_idx').on(table.title),
   index('works_title_search_idx').on(table.titleSearch),
 ]);
+
+export const editions = sqliteTable('editions', {
+  id: text('id').primaryKey(),
+  displayedTitle: text('displayed_title'),
+  language: text('language'),
+  publisher: text('publisher'),
+  publicationDate: text('publication_date'),
+  format: text('format', { enum: EDITION_FORMATS }).notNull(),
+  progressUnit: text('progress_unit', { enum: PROGRESS_UNITS }).notNull(),
+  coverUrl: text('cover_url'),
+  editionLength: integer('edition_length'),
+}, (table) => [
+  index('editions_format_idx').on(table.format),
+]);
+
+export const editionIdentifiers = sqliteTable('edition_identifiers', {
+  id: text('id').primaryKey(),
+  editionId: text('edition_id')
+    .notNull()
+    .references(() => editions.id, { onDelete: 'cascade' }),
+  namespace: text('namespace', { enum: IDENTIFIER_NAMESPACES }).notNull(),
+  value: text('value').notNull(),
+  valueNormalized: text('value_normalized').notNull(),
+  provenance: text('provenance'),
+}, (table) => [
+  uniqueIndex('edition_identifiers_namespace_value_uidx').on(
+    table.namespace,
+    table.valueNormalized
+  ),
+  index('edition_identifiers_value_normalized_idx').on(table.valueNormalized),
+  index('edition_identifiers_edition_id_idx').on(table.editionId),
+]);
+
+export const editionContents = sqliteTable('edition_contents', {
+  id: text('id').primaryKey(),
+  editionId: text('edition_id')
+    .notNull()
+    .references(() => editions.id, { onDelete: 'cascade' }),
+  workId: text('work_id')
+    .notNull()
+    .references(() => works.id),
+  sortOrder: integer('sort_order').notNull(),
+}, (table) => [
+  index('edition_contents_edition_id_idx').on(table.editionId),
+  index('edition_contents_work_id_idx').on(table.workId),
+]);
+
+export const subjects = sqliteTable('subjects', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  nameNormalized: text('name_normalized').notNull(),
+}, (table) => [
+  uniqueIndex('subjects_name_normalized_uidx').on(table.nameNormalized),
+]);
+
+export const workSubjects = sqliteTable('work_subjects', {
+  id: text('id').primaryKey(),
+  workId: text('work_id')
+    .notNull()
+    .references(() => works.id, { onDelete: 'cascade' }),
+  subjectId: text('subject_id')
+    .notNull()
+    .references(() => subjects.id),
+  provenance: text('provenance'),
+}, (table) => [
+  uniqueIndex('work_subjects_work_subject_uidx').on(table.workId, table.subjectId),
+  index('work_subjects_subject_id_idx').on(table.subjectId),
+]);
+
+export const contributors = sqliteTable('contributors', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  nameSearch: text('name_search').notNull(),
+}, (table) => [
+  uniqueIndex('contributors_name_search_uidx').on(table.nameSearch),
+]);
+
+export const contributions = sqliteTable('contributions', {
+  id: text('id').primaryKey(),
+  contributorId: text('contributor_id')
+    .notNull()
+    .references(() => contributors.id),
+  workId: text('work_id').references(() => works.id, { onDelete: 'cascade' }),
+  editionId: text('edition_id').references(() => editions.id, { onDelete: 'cascade' }),
+  role: text('role', { enum: CONTRIBUTION_ROLES }).notNull(),
+}, (table) => [
+  index('contributions_contributor_id_idx').on(table.contributorId),
+  index('contributions_work_id_idx').on(table.workId),
+  index('contributions_edition_id_idx').on(table.editionId),
+]);
+
+export const catalogProviderCache = sqliteTable('catalog_provider_cache', {
+  cacheKey: text('cache_key').primaryKey(),
+  payload: text('payload').notNull(),
+  fetchedAt: integer('fetched_at').notNull(),
+});
 
 export const books = sqliteTable('books', {
   id: text('id').primaryKey(),
@@ -118,6 +238,21 @@ export const verification = sqliteTable("verification", {
 
 export type Work = typeof works.$inferSelect;
 export type NewWork = typeof works.$inferInsert;
+export type Edition = typeof editions.$inferSelect;
+export type NewEdition = typeof editions.$inferInsert;
+export type EditionContent = typeof editionContents.$inferSelect;
+export type NewEditionContent = typeof editionContents.$inferInsert;
+export type EditionIdentifier = typeof editionIdentifiers.$inferSelect;
+export type NewEditionIdentifier = typeof editionIdentifiers.$inferInsert;
+export type Subject = typeof subjects.$inferSelect;
+export type NewSubject = typeof subjects.$inferInsert;
+export type WorkSubject = typeof workSubjects.$inferSelect;
+export type NewWorkSubject = typeof workSubjects.$inferInsert;
+export type Contributor = typeof contributors.$inferSelect;
+export type NewContributor = typeof contributors.$inferInsert;
+export type Contribution = typeof contributions.$inferSelect;
+export type NewContribution = typeof contributions.$inferInsert;
+export type CatalogProviderCache = typeof catalogProviderCache.$inferSelect;
 
 // Types for our book and reading session data
 export type Book = typeof books.$inferSelect;

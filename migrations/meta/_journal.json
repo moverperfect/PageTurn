@@ -64,6 +64,41 @@
       "when": 1788725016479,
       "tag": "0008_known_lila_cheney",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1788770115969,
+      "tag": "0009_create_editions",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788770748476,
+      "tag": "0010_create_subjects",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1788771265070,
+      "tag": "0011_create_edition_identifiers",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1788771856676,
+      "tag": "0012_create_contributors",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1788772529811,
+      "tag": "0013_catalog_provider_cache",
+      "breakpoints": true
     }
   ]
 }

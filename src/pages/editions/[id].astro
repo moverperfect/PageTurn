@@ -1,0 +1,308 @@
+---
+import { env } from 'cloudflare:workers';
+import Layout from '../../layouts/Layout.astro';
+import {
+  assignEditionIdentifier,
+  CatalogConflictError,
+  CatalogNotFoundError,
+  CatalogValidationError,
+  creditEdition,
+  FORMAT_LABELS,
+  loadEditionResource,
+  NAMESPACE_LABELS,
+  PROGRESS_UNIT_LABELS,
+  ROLE_LABELS,
+  toWorkResource,
+} from '../../lib/catalog';
+import { CONTRIBUTION_ROLES, IDENTIFIER_NAMESPACES } from '../../lib/schema';
+import { getEditionById, getEditionContents, getWorkById } from '../../lib/db';
+
+if (!Astro.locals.session?.User) {
+  return Astro.redirect('/login');
+}
+
+const { id } = Astro.params;
+const edition = id ? await getEditionById(id, env) : undefined;
+const contents = edition ? await getEditionContents(edition.id, env) : [];
+const works = await Promise.all(
+  contents.map((content) => getWorkById(content.workId, env))
+);
+
+if (!edition) {
+  Astro.response.status = 404;
+}
+
+let resource = edition ? await loadEditionResource(edition, env) : null;
+const workResources = works.flatMap((work) => (work ? [toWorkResource(work)] : []));
+let identifierError = '';
+let identifierForm = { namespace: '', value: '', provenance: '' };
+let creditError = '';
+let creditForm = { name: '', role: '' };
+
+if (resource && Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const intent = (data.get('intent') as string) || 'identifier';
+  try {
+    if (intent === 'contribution') {
+      creditForm = {
+        name: (data.get('name') as string) || '',
+        role: (data.get('role') as string) || '',
+      };
+      resource = await creditEdition(
+        resource.id,
+        { name: creditForm.name, role: creditForm.role },
+        env
+      );
+      creditForm = { name: '', role: '' };
+    } else {
+      identifierForm = {
+        namespace: (data.get('namespace') as string) || '',
+        value: (data.get('value') as string) || '',
+        provenance: (data.get('provenance') as string) || '',
+      };
+      resource = await assignEditionIdentifier(resource.id, identifierForm, env);
+      identifierForm = { namespace: '', value: '', provenance: '' };
+    }
+  } catch (error) {
+    if (
+      error instanceof CatalogValidationError ||
+      error instanceof CatalogNotFoundError ||
+      error instanceof CatalogConflictError
+    ) {
+      if (intent === 'contribution') {
+        creditError = error.message;
+      } else {
+        identifierError = error.message;
+      }
+    } else if (intent === 'contribution') {
+      console.error('Error crediting Edition:', error);
+      creditError = 'Failed to add Contribution. Please try again.';
+    } else {
+      console.error('Error assigning identifier:', error);
+      identifierError = 'Failed to add identifier. Please try again.';
+    }
+  }
+}
+---
+
+<Layout title={resource ? `${resource.displayedTitle ?? 'Edition'} | PageTurn` : 'Edition not found | PageTurn'}>
+  {
+    resource ? (
+      <div>
+        <p class="mb-4">
+          {workResources[0] ? (
+            <a href={`/works/${workResources[0].id}`}>Back to {workResources[0].title}</a>
+          ) : (
+            <a href="/works">Back to catalog</a>
+          )}
+        </p>
+        <h1 data-field="heading">
+          {resource.displayedTitle ?? 'Untitled Edition'}
+        </h1>
+        <dl class="card max-w-2xl space-y-4">
+          <div>
+            <dt class="text-sm text-slate-400">Displayed title</dt>
+            <dd data-field="displayed-title">
+              {resource.displayedTitle ?? 'Unknown'}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">Format</dt>
+            <dd data-field="format">{FORMAT_LABELS[resource.format]}</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">Progress Unit</dt>
+            <dd data-field="progress-unit">
+              {PROGRESS_UNIT_LABELS[resource.progressUnit]}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">Language</dt>
+            <dd data-field="language">{resource.language ?? 'Unknown'}</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">Publisher</dt>
+            <dd data-field="publisher">{resource.publisher ?? 'Unknown'}</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">Publication date</dt>
+            <dd data-field="publication-date">
+              {resource.publicationDate ?? 'Unknown'}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">Cover</dt>
+            <dd data-field="cover">
+              {resource.coverUrl ? (
+                <img src={resource.coverUrl} alt="" class="max-h-48 rounded" />
+              ) : (
+                'Unknown'
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm text-slate-400">Edition Length</dt>
+            <dd data-field="edition-length">
+              {resource.editionLength ?? 'Unknown'}
+            </dd>
+          </div>
+        </dl>
+        <section class="mt-8 max-w-2xl">
+          <h2>Identifiers</h2>
+          {resource.identifiers.length === 0 ? (
+            <p data-field="identifiers-empty" class="text-slate-400">
+              This Edition has no identifiers.
+            </p>
+          ) : (
+            <ul data-field="identifiers" class="mt-4 space-y-2">
+              {resource.identifiers.map((identifier) => (
+                <li data-namespace={identifier.namespace}>
+                  <span data-field="identifier-namespace">
+                    {NAMESPACE_LABELS[identifier.namespace]}
+                  </span>
+                  <span data-field="identifier-value" class="ml-2">
+                    {identifier.value}
+                  </span>
+                  {identifier.provenance && (
+                    <span data-field="identifier-provenance" class="text-slate-400 text-sm ml-2">
+                      {identifier.provenance}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {identifierError && (
+            <div
+              class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded my-4"
+              role="alert"
+            >
+              <p>{identifierError}</p>
+            </div>
+          )}
+
+          <form method="POST" class="mt-6 space-y-4">
+            <input type="hidden" name="intent" value="identifier" />
+            <div>
+              <label for="namespace" class="form-label">Namespace</label>
+              <select id="namespace" name="namespace" required class="form-input">
+                <option value="" selected={identifierForm.namespace === ''}>
+                  Select a namespace
+                </option>
+                {IDENTIFIER_NAMESPACES.map((namespace) => (
+                  <option
+                    value={namespace}
+                    selected={identifierForm.namespace === namespace}
+                  >
+                    {NAMESPACE_LABELS[namespace]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label for="value" class="form-label">Value</label>
+              <input
+                type="text"
+                id="value"
+                name="value"
+                required
+                class="form-input"
+                value={identifierForm.value}
+              />
+            </div>
+            <div>
+              <label for="provenance" class="form-label">
+                Provenance
+                <span class="text-slate-400 font-normal"> (optional)</span>
+              </label>
+              <input
+                type="text"
+                id="provenance"
+                name="provenance"
+                class="form-input"
+                value={identifierForm.provenance}
+              />
+            </div>
+            <button type="submit" class="btn">Add identifier</button>
+          </form>
+        </section>
+        <section class="mt-8 max-w-2xl" data-field="edition-credits">
+          <h2>Contributions</h2>
+          {resource.contributions.length === 0 ? (
+            <p data-field="edition-credits-empty" class="text-slate-400">
+              This Edition has no Contributions.
+            </p>
+          ) : (
+            <ul data-field="edition-credits-list" class="mt-4 space-y-2">
+              {resource.contributions.map((credit) => (
+                <li data-contribution-id={credit.id}>
+                  <span data-field="contributor-name">{credit.contributor.name}</span>
+                  <span class="text-slate-400 text-sm ml-2" data-field="contributor-role">
+                    {ROLE_LABELS[credit.role]}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {creditError && (
+            <div
+              class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded my-4"
+              role="alert"
+            >
+              <p>{creditError}</p>
+            </div>
+          )}
+
+          <form method="POST" class="mt-6 space-y-4">
+            <input type="hidden" name="intent" value="contribution" />
+            <div>
+              <label for="contributor-name" class="form-label">Contributor</label>
+              <input
+                type="text"
+                id="contributor-name"
+                name="name"
+                required
+                class="form-input"
+                value={creditForm.name}
+              />
+            </div>
+            <div>
+              <label for="edition-role" class="form-label">Role</label>
+              <select id="edition-role" name="role" required class="form-input">
+                <option value="" selected={creditForm.role === ''}>
+                  Select a role
+                </option>
+                {CONTRIBUTION_ROLES.map((role) => (
+                  <option value={role} selected={creditForm.role === role}>
+                    {ROLE_LABELS[role]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" class="btn">Add Contribution</button>
+          </form>
+        </section>
+        <section class="mt-8">
+          <h2>Works in this Edition</h2>
+          <ul data-field="edition-contents" class="mt-4 space-y-2">
+            {workResources.map((work) => (
+              <li>
+                <a href={`/works/${work.id}`}>{work.title}</a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+    ) : (
+      <div class="card text-center py-12">
+        <h1>Edition not found</h1>
+        <p class="mb-6">That Edition is not in the local catalog.</p>
+        <a href="/works" class="btn">
+          Back to catalog
+        </a>
+      </div>
+    )
+  }
+</Layout>

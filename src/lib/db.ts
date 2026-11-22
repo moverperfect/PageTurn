@@ -1,15 +1,37 @@
 // Types for our book and reading session data
-import { eq, and, sql, inArray, asc } from 'drizzle-orm';
+import { eq, and, sql, inArray, asc, lt } from 'drizzle-orm';
 import { getDbClient } from './db-client';
-import { books, readingSessions, works, type Book, type ReadingSession, type Work } from './schema';
+import {
+  books,
+  catalogProviderCache,
+  contributions,
+  contributors,
+  editionContents,
+  editionIdentifiers,
+  editions,
+  readingSessions,
+  subjects,
+  works,
+  workSubjects,
+  type Book,
+  type Contribution,
+  type Contributor,
+  type Edition,
+  type EditionContent,
+  type EditionIdentifier,
+  type ReadingSession,
+  type Subject,
+  type Work,
+  type WorkSubject,
+} from './schema';
 import { v4 as uuidv4 } from 'uuid';
 
 const WORK_SEARCH_LIMIT = 50;
 
-function foldSearchText(value: string): string {
-  // toLowerCase() maps Greek final sigma (ΟΣ → ος) but not a lone Σ → σ.
-  // Fold ς → σ so stored titles and queries share one substring key.
-  return value.normalize('NFC').toLowerCase().replaceAll('ς', 'σ');
+export function foldSearchText(value: string): string {
+  // toLowerCase() maps Greek final sigma (ΟΣ → ος) but not a lone Σ → σ,
+  // and leaves ß distinct from ss. Fold those so caseless keys match.
+  return value.normalize('NFC').toLowerCase().replaceAll('ß', 'ss').replaceAll('ς', 'σ');
 }
 
 /**
@@ -82,6 +104,607 @@ export async function searchWorks(query: string, env: Env): Promise<Work[]> {
     console.error('Error searching works:', error);
     throw new Error(`Failed to search works: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+}
+
+/**
+ * Inserts an Edition and its Edition Content for a Work in one D1 batch.
+ */
+export async function insertEditionWithContent(
+  editionData: Omit<Edition, 'id'>,
+  workId: string,
+  env: Env
+): Promise<{ edition: Edition; contents: EditionContent[] }> {
+  const edition: Edition = {
+    ...editionData,
+    id: uuidv4(),
+  };
+  const content: EditionContent = {
+    id: uuidv4(),
+    editionId: edition.id,
+    workId,
+    sortOrder: 0,
+  };
+
+  try {
+    const db = getDbClient(env);
+    await db.batch([
+      db.insert(editions).values(edition),
+      db.insert(editionContents).values(content),
+    ]);
+    return { edition, contents: [content] };
+  } catch (error) {
+    console.error('Error adding edition:', error);
+    throw new Error(`Failed to add edition: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Retrieves an Edition by its unique ID.
+ */
+export async function getEditionById(id: string, env: Env): Promise<Edition | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db.select().from(editions).where(eq(editions.id, id)).limit(1);
+    return results[0];
+  } catch (error) {
+    console.error('Error getting edition by ID:', error);
+    throw new Error(`Failed to retrieve edition: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Retrieves Edition Contents for an Edition, ordered for display.
+ */
+export async function getEditionContents(
+  editionId: string,
+  env: Env
+): Promise<EditionContent[]> {
+  try {
+    const db = getDbClient(env);
+    return await db
+      .select()
+      .from(editionContents)
+      .where(eq(editionContents.editionId, editionId))
+      .orderBy(asc(editionContents.sortOrder));
+  } catch (error) {
+    console.error('Error getting edition contents:', error);
+    throw new Error(`Failed to retrieve edition contents: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Retrieves Editions that contain a Work, oldest-created first via content order.
+ */
+export async function getEditionsForWork(workId: string, env: Env): Promise<Edition[]> {
+  try {
+    const db = getDbClient(env);
+    return await db
+      .select({
+        id: editions.id,
+        displayedTitle: editions.displayedTitle,
+        language: editions.language,
+        publisher: editions.publisher,
+        publicationDate: editions.publicationDate,
+        format: editions.format,
+        progressUnit: editions.progressUnit,
+        coverUrl: editions.coverUrl,
+        editionLength: editions.editionLength,
+      })
+      .from(editions)
+      .innerJoin(editionContents, eq(editionContents.editionId, editions.id))
+      .where(eq(editionContents.workId, workId))
+      .orderBy(asc(editionContents.sortOrder), asc(editions.id));
+  } catch (error) {
+    console.error('Error getting editions for work:', error);
+    throw new Error(`Failed to retrieve editions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export class IdentifierConflictError extends Error {
+  constructor(
+    message: string,
+    readonly existingEditionId: string
+  ) {
+    super(message);
+    this.name = 'IdentifierConflictError';
+  }
+}
+
+/**
+ * Retrieves typed identifiers for an Edition.
+ */
+export async function getIdentifiersForEdition(
+  editionId: string,
+  env: Env
+): Promise<EditionIdentifier[]> {
+  try {
+    const db = getDbClient(env);
+    return await db
+      .select()
+      .from(editionIdentifiers)
+      .where(eq(editionIdentifiers.editionId, editionId))
+      .orderBy(asc(editionIdentifiers.namespace), asc(editionIdentifiers.value));
+  } catch (error) {
+    console.error('Error getting edition identifiers:', error);
+    throw new Error(`Failed to retrieve identifiers: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Finds an identifier by namespace and normalized value.
+ */
+export async function findIdentifier(
+  namespace: EditionIdentifier['namespace'],
+  valueNormalized: string,
+  env: Env
+): Promise<EditionIdentifier | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db
+      .select()
+      .from(editionIdentifiers)
+      .where(
+        and(
+          eq(editionIdentifiers.namespace, namespace),
+          eq(editionIdentifiers.valueNormalized, valueNormalized)
+        )
+      )
+      .limit(1);
+    return results[0];
+  } catch (error) {
+    console.error('Error finding identifier:', error);
+    throw new Error(`Failed to find identifier: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Finds identifiers whose normalized value matches, any namespace.
+ */
+export async function findIdentifiersByNormalizedValue(
+  valueNormalized: string,
+  env: Env
+): Promise<EditionIdentifier[]> {
+  try {
+    const db = getDbClient(env);
+    return await db
+      .select()
+      .from(editionIdentifiers)
+      .where(eq(editionIdentifiers.valueNormalized, valueNormalized))
+      .orderBy(asc(editionIdentifiers.namespace));
+  } catch (error) {
+    console.error('Error finding identifiers by value:', error);
+    throw new Error(`Failed to find identifier: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Assigns a typed identifier to an Edition. Conflicting values are rejected.
+ */
+export async function insertEditionIdentifier(
+  identifier: Omit<EditionIdentifier, 'id'>,
+  env: Env
+): Promise<EditionIdentifier> {
+  const existing = await findIdentifier(identifier.namespace, identifier.valueNormalized, env);
+  if (existing) {
+    if (existing.editionId === identifier.editionId) {
+      return existing;
+    }
+    throw new IdentifierConflictError(
+      'That identifier is already assigned to another Edition',
+      existing.editionId
+    );
+  }
+
+  const row: EditionIdentifier = {
+    ...identifier,
+    id: uuidv4(),
+  };
+
+  try {
+    const db = getDbClient(env);
+    await db.insert(editionIdentifiers).values(row);
+    return row;
+  } catch (error) {
+    const raced = await findIdentifier(identifier.namespace, identifier.valueNormalized, env);
+    if (raced) {
+      if (raced.editionId === identifier.editionId) {
+        return raced;
+      }
+      throw new IdentifierConflictError(
+        'That identifier is already assigned to another Edition',
+        raced.editionId
+      );
+    }
+    console.error('Error adding identifier:', error);
+    throw new Error(`Failed to add identifier: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export interface SubjectClassification {
+  id: string;
+  name: string;
+  provenance: string | null;
+}
+
+/**
+ * Finds a Subject by its normalized name, if one already exists.
+ */
+export async function findSubjectByNormalizedName(
+  nameNormalized: string,
+  env: Env
+): Promise<Subject | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db
+      .select()
+      .from(subjects)
+      .where(eq(subjects.nameNormalized, nameNormalized))
+      .limit(1);
+    return results[0];
+  } catch (error) {
+    console.error('Error finding subject:', error);
+    throw new Error(`Failed to find subject: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Inserts a Subject, or returns the existing one when the normalized name is taken.
+ */
+export async function insertSubject(
+  name: string,
+  nameNormalized: string,
+  env: Env
+): Promise<Subject> {
+  const existing = await findSubjectByNormalizedName(nameNormalized, env);
+  if (existing) {
+    return existing;
+  }
+
+  const subject: Subject = {
+    id: uuidv4(),
+    name,
+    nameNormalized,
+  };
+
+  try {
+    const db = getDbClient(env);
+    await db.insert(subjects).values(subject);
+    return subject;
+  } catch (error) {
+    const raced = await findSubjectByNormalizedName(nameNormalized, env);
+    if (raced) {
+      return raced;
+    }
+    console.error('Error adding subject:', error);
+    throw new Error(`Failed to add subject: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Attaches a Subject to a Work, keeping the first provenance if already classified.
+ */
+export async function classifyWorkWithSubject(
+  workId: string,
+  subjectId: string,
+  provenance: string | null,
+  env: Env
+): Promise<WorkSubject> {
+  try {
+    const db = getDbClient(env);
+    const existing = await db
+      .select()
+      .from(workSubjects)
+      .where(and(eq(workSubjects.workId, workId), eq(workSubjects.subjectId, subjectId)))
+      .limit(1);
+    if (existing[0]) {
+      return existing[0];
+    }
+
+    const classification: WorkSubject = {
+      id: uuidv4(),
+      workId,
+      subjectId,
+      provenance,
+    };
+    await db.insert(workSubjects).values(classification);
+    return classification;
+  } catch (error) {
+    const db = getDbClient(env);
+    const raced = await db
+      .select()
+      .from(workSubjects)
+      .where(and(eq(workSubjects.workId, workId), eq(workSubjects.subjectId, subjectId)))
+      .limit(1);
+    if (raced[0]) {
+      return raced[0];
+    }
+    console.error('Error classifying work:', error);
+    throw new Error(`Failed to classify work: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Retrieves Subject classifications for one Work.
+ */
+export async function getSubjectClassificationsForWork(
+  workId: string,
+  env: Env
+): Promise<SubjectClassification[]> {
+  const byWork = await getSubjectClassificationsForWorks([workId], env);
+  return byWork.get(workId) ?? [];
+}
+
+/**
+ * Retrieves Subject classifications for many Works.
+ */
+export async function getSubjectClassificationsForWorks(
+  workIds: string[],
+  env: Env
+): Promise<Map<string, SubjectClassification[]>> {
+  const classified = new Map<string, SubjectClassification[]>();
+  if (workIds.length === 0) {
+    return classified;
+  }
+
+  try {
+    const db = getDbClient(env);
+    const rows = await db
+      .select({
+        workId: workSubjects.workId,
+        id: subjects.id,
+        name: subjects.name,
+        provenance: workSubjects.provenance,
+      })
+      .from(workSubjects)
+      .innerJoin(subjects, eq(subjects.id, workSubjects.subjectId))
+      .where(inArray(workSubjects.workId, workIds))
+      .orderBy(asc(subjects.name));
+
+    for (const id of workIds) {
+      classified.set(id, []);
+    }
+    for (const row of rows) {
+      classified.get(row.workId)?.push({
+        id: row.id,
+        name: row.name,
+        provenance: row.provenance ?? null,
+      });
+    }
+    return classified;
+  } catch (error) {
+    console.error('Error getting subject classifications:', error);
+    throw new Error(`Failed to retrieve subjects: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export interface ContributionCredit {
+  id: string;
+  role: Contribution['role'];
+  contributor: { id: string; name: string };
+}
+
+export async function findContributorByNameSearch(
+  nameSearch: string,
+  env: Env
+): Promise<Contributor | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db
+      .select()
+      .from(contributors)
+      .where(eq(contributors.nameSearch, nameSearch))
+      .limit(1);
+    return results[0];
+  } catch (error) {
+    console.error('Error finding contributor:', error);
+    throw new Error(`Failed to find contributor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export async function insertContributor(
+  name: string,
+  env: Env
+): Promise<Contributor> {
+  const nameSearch = foldSearchText(name);
+  const existing = await findContributorByNameSearch(nameSearch, env);
+  if (existing) {
+    return existing;
+  }
+
+  const contributor: Contributor = {
+    id: uuidv4(),
+    name,
+    nameSearch,
+  };
+
+  try {
+    const db = getDbClient(env);
+    await db.insert(contributors).values(contributor);
+    return contributor;
+  } catch (error) {
+    const raced = await findContributorByNameSearch(nameSearch, env);
+    if (raced) {
+      return raced;
+    }
+    console.error('Error adding contributor:', error);
+    throw new Error(`Failed to add contributor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export async function insertContribution(
+  contributionData: Omit<Contribution, 'id'>,
+  env: Env
+): Promise<Contribution> {
+  try {
+    const db = getDbClient(env);
+    const existing = await db
+      .select()
+      .from(contributions)
+      .where(
+        and(
+          eq(contributions.contributorId, contributionData.contributorId),
+          eq(contributions.role, contributionData.role),
+          contributionData.workId
+            ? eq(contributions.workId, contributionData.workId)
+            : eq(contributions.editionId, contributionData.editionId!)
+        )
+      )
+      .limit(1);
+    if (existing[0]) {
+      return existing[0];
+    }
+
+    const contribution: Contribution = { ...contributionData, id: uuidv4() };
+    await db.insert(contributions).values(contribution);
+    return contribution;
+  } catch (error) {
+    console.error('Error adding contribution:', error);
+    throw new Error(`Failed to add contribution: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export async function deleteContribution(id: string, env: Env): Promise<boolean> {
+  try {
+    const db = getDbClient(env);
+    const result = await db.delete(contributions).where(eq(contributions.id, id));
+    if ('success' in result) {
+      return result.success;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error deleting contribution:', error);
+    throw new Error(`Failed to delete contribution: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+export async function getContributionById(
+  id: string,
+  env: Env
+): Promise<Contribution | undefined> {
+  try {
+    const db = getDbClient(env);
+    const results = await db
+      .select()
+      .from(contributions)
+      .where(eq(contributions.id, id))
+      .limit(1);
+    return results[0];
+  } catch (error) {
+    console.error('Error getting contribution:', error);
+    throw new Error(`Failed to retrieve contribution: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+const PROVIDER_CACHE_TTL_SECONDS = 60 * 60;
+
+export async function getProviderCache(
+  cacheKey: string,
+  env: Env
+): Promise<string | null> {
+  try {
+    const db = getDbClient(env);
+    const rows = await db
+      .select()
+      .from(catalogProviderCache)
+      .where(eq(catalogProviderCache.cacheKey, cacheKey))
+      .limit(1);
+    const row = rows[0];
+    if (!row) {
+      return null;
+    }
+    if (Math.floor(Date.now() / 1000) - row.fetchedAt > PROVIDER_CACHE_TTL_SECONDS) {
+      await db.delete(catalogProviderCache).where(eq(catalogProviderCache.cacheKey, cacheKey));
+      return null;
+    }
+    return row.payload;
+  } catch (error) {
+    console.error('Error reading provider cache:', error);
+    return null;
+  }
+}
+
+export async function setProviderCache(
+  cacheKey: string,
+  payload: string,
+  env: Env
+): Promise<void> {
+  try {
+    const db = getDbClient(env);
+    const fetchedAt = Math.floor(Date.now() / 1000);
+    await db
+      .delete(catalogProviderCache)
+      .where(lt(catalogProviderCache.fetchedAt, fetchedAt - PROVIDER_CACHE_TTL_SECONDS));
+    await db
+      .insert(catalogProviderCache)
+      .values({ cacheKey, payload, fetchedAt })
+      .onConflictDoUpdate({
+        target: catalogProviderCache.cacheKey,
+        set: { payload, fetchedAt },
+      });
+  } catch (error) {
+    console.error('Error writing provider cache:', error);
+  }
+}
+
+async function creditsWhere(
+  column: typeof contributions.workId | typeof contributions.editionId,
+  ids: string[],
+  env: Env
+): Promise<Map<string, ContributionCredit[]>> {
+  const credits = new Map<string, ContributionCredit[]>();
+  if (ids.length === 0) {
+    return credits;
+  }
+
+  const db = getDbClient(env);
+  const rows = await db
+    .select({
+      targetId: column,
+      id: contributions.id,
+      role: contributions.role,
+      contributorId: contributors.id,
+      contributorName: contributors.name,
+    })
+    .from(contributions)
+    .innerJoin(contributors, eq(contributors.id, contributions.contributorId))
+    .where(inArray(column, ids))
+    .orderBy(asc(contributions.role), asc(contributors.name));
+
+  for (const id of ids) {
+    credits.set(id, []);
+  }
+  for (const row of rows) {
+    if (!row.targetId) {
+      continue;
+    }
+    credits.get(row.targetId)?.push({
+      id: row.id,
+      role: row.role,
+      contributor: { id: row.contributorId, name: row.contributorName },
+    });
+  }
+  return credits;
+}
+
+export async function getCreditsForWork(
+  workId: string,
+  env: Env
+): Promise<ContributionCredit[]> {
+  return (await getCreditsForWorks([workId], env)).get(workId) ?? [];
+}
+
+export async function getCreditsForWorks(
+  workIds: string[],
+  env: Env
+): Promise<Map<string, ContributionCredit[]>> {
+  return creditsWhere(contributions.workId, workIds, env);
+}
+
+export async function getCreditsForEdition(
+  editionId: string,
+  env: Env
+): Promise<ContributionCredit[]> {
+  return (await creditsWhere(contributions.editionId, [editionId], env)).get(editionId) ?? [];
 }
 
 /**

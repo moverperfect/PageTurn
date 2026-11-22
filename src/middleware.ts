@@ -3,7 +3,27 @@ import { getAuth } from "./lib/auth";
 import { jsonResponse } from "./lib/api-auth";
 import { defineMiddleware } from "astro:middleware";
 
+function hasSessionCookie(request: Request): boolean {
+  const cookie = request.headers.get('cookie');
+  return cookie != null && cookie.includes('better-auth.session_token=');
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
+  const path = context.url.pathname;
+  const isLoginPath = path === "/login";
+  const isAuthApiRoute = path === "/api/auth" || path.startsWith("/api/auth/");
+  const isApiRoute = path.startsWith("/api/");
+
+  // Cookieless requests must not touch D1. Local D1 serializes queries, and
+  // getSession racing a page that also reads the database waits out SQLite's
+  // 30s busy timeout (the unauthenticated GET /works acceptance flake).
+  if (!hasSessionCookie(context.request) && !isLoginPath && !isAuthApiRoute) {
+    if (isApiRoute) {
+      return jsonResponse({ error: 'Unauthorized' }, 401);
+    }
+    return context.redirect("/login");
+  }
+
   let isAuthed;
   try {
     isAuthed = await getAuth(env, context.request).api
@@ -22,11 +42,6 @@ export const onRequest = defineMiddleware(async (context, next) => {
     };
     return next();
   }
-
-  const path = context.url.pathname;
-  const isLoginPath = path === "/login";
-  const isAuthApiRoute = path === "/api/auth" || path.startsWith("/api/auth/");
-  const isApiRoute = path.startsWith("/api/");
 
   if (isLoginPath || isAuthApiRoute) {
     return next();
