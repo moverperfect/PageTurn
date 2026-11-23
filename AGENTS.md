@@ -4,7 +4,7 @@ Guidance for AI coding assistants working on the PageTurn codebase.
 
 ## Project Overview
 
-**PageTurn** is a modern reading tracker application that helps users monitor reading progress, manage book collections, and analyze reading habits. It is built for deployment on Cloudflare Pages.
+**PageTurn** is a modern reading tracker application that helps Readers monitor reading progress, manage their Library, and analyze reading habits. It is deployed as a Cloudflare Worker.
 
 ## Tech Stack
 
@@ -12,7 +12,7 @@ Guidance for AI coding assistants working on the PageTurn codebase.
 |------------|---------|
 | [Astro](https://astro.build) | Web framework (server output mode) |
 | [TailwindCSS](https://tailwindcss.com) | Styling |
-| [Cloudflare Pages](https://pages.cloudflare.com) | Hosting and deployment |
+| [Cloudflare Workers](https://developers.cloudflare.com/workers/) | Hosting; Workers Builds deploys `main` |
 | [Drizzle ORM](https://orm.drizzle.team) | Database access (Cloudflare D1 / SQLite) |
 | [better-auth](https://better-auth.com) | Authentication |
 | [Wrangler](https://developers.cloudflare.com/workers/wrangler/) | Cloudflare tooling and local dev |
@@ -86,14 +86,14 @@ migrations/           # Drizzle migrations
 | `pnpm install` | Install dependencies |
 | `pnpm run dev` | Local dev at `localhost:4321` |
 | `pnpm run build` | Build for production |
-| `pnpm run preview` | Build and preview with Wrangler Pages locally |
+| `pnpm run preview` | Build and preview the Worker locally |
 | `pnpm run test:acceptance` | Build, then run the acceptance suite against the built Worker on an isolated D1 (see `docs/acceptance-testing.md`) |
 | `pnpm run test:migrations` | Fast schema checks: apply `migrations/` to a scratch SQLite database and verify deletion semantics |
-| `pnpm run deploy` | Build and deploy to Cloudflare Pages |
+| `pnpm run deploy` | Build, apply pending production migrations, then deploy |
+| `pnpm run deploy:production` | Apply pending production migrations, then deploy an existing build (Workers Builds' deploy command) |
 | `pnpm run cf-typegen` | Regenerate Cloudflare binding/runtime types |
 | `pnpm run db:generate` | Generate Drizzle migrations |
 | `pnpm run db:migrate:local` | Apply migrations to local D1 |
-| `pnpm run db:migrate:preview` | Apply migrations to preview D1 |
 | `pnpm run db:migrate:prod` | Apply migrations to production D1 |
 
 ## Notes for Agents
@@ -104,6 +104,7 @@ migrations/           # Drizzle migrations
 - When adding new DB queries, add them to `src/lib/db.ts` and keep API routes thin.
 - API routes follow REST-style patterns; use appropriate HTTP methods (GET, POST, PUT, PATCH, DELETE).
 - Avoid hardcoding secrets; use environment variables / wrangler secrets.
+- Deploying `main` applies pending migrations to production D1 before the new Worker goes live, so every migration must leave the schema usable by the code already in production. Drop or rename a structure only in a later PR, after the code that stops using it is live. Branch previews share production D1: never apply an unmerged migration to it. See README's "Deployment and migrations".
 
 ## Agent skills
 

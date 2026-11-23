@@ -14,12 +14,12 @@
     "test:acceptance": "node scripts/acceptance.mjs",
     "test:migrations": "vitest run --project migrations",
     "astro": "astro",
-    "deploy": "astro build && wrangler deploy",
+    "deploy": "astro build && pnpm run deploy:production",
+    "deploy:production": "cross-env CI=true pnpm run db:migrate:prod && wrangler deploy",
     "cf-typegen": "wrangler types",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply page-turn --local",
-    "db:migrate:prod": "wrangler d1 migrations apply page-turn --remote",
-    "db:migrate:preview": "wrangler d1 migrations apply --env preview page-turn --remote"
+    "db:migrate:prod": "wrangler d1 migrations apply page-turn --remote"
   },
   "dependencies": {
     "@astrojs/check": "0.9.12",

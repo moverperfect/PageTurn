@@ -24,7 +24,7 @@ PageTurn is a modern reading tracker application that helps you monitor your rea
 | `pnpm dev`        | Starts local dev server at `localhost:4321`  |
 | `pnpm build`      | Type-check and build the production Worker   |
 | `pnpm preview`    | Preview the Worker locally with workerd      |
-| `pnpm deploy`     | Deploy to Cloudflare Workers                 |
+| `pnpm run deploy` | Build, migrate production D1, then deploy    |
 
 ## Auth Preview Configuration
 
@@ -42,10 +42,44 @@ Workers preview URLs do not provide `CF_PAGES_URL`. Configure preview auth expli
 | `pnpm db:generate`           | Generate database migration files              |
 | `pnpm db:migrate:local`      | Apply migrations to local development database |
 | `pnpm db:migrate:prod`       | Apply migrations to production database        |
-| `pnpm db:migrate:preview`    | Apply migrations to preview environment        |
-| `pnpm db:studio:local`       | Open Drizzle Studio for local database         |
-| `pnpm db:studio:preview`     | Open Drizzle Studio for preview database       |
-| `pnpm db:studio:prod`        | Open Drizzle Studio for production database    |
+
+## Deployment and migrations
+
+Cloudflare Workers Builds deploys every push to `main`, running
+`pnpm run deploy:production` once the build finishes. That script applies any
+pending migrations in `migrations/` to the production D1 database
+(`page-turn`), then runs `wrangler deploy`. If a migration fails, the script
+stops before `wrangler deploy`, so the new Worker version never goes live; the
+migrations before the failed one stay applied. With nothing pending, it goes
+straight to the deploy. `pnpm run deploy` builds, then does the same from a
+local checkout without a confirmation prompt.
+
+This depends on settings in the Cloudflare dashboard, under Workers & Pages →
+`pageturn` → Settings → Build:
+
+| Setting        | Value                                                                                       |
+| :------------- | :------------------------------------------------------------------------------------------ |
+| Build command  | `pnpm run build`, which writes the `dist/` that the deploy command uploads                  |
+| Deploy command | `pnpm run deploy:production`                                                                |
+| API token      | A user API token with **Account · D1 · Edit** added; the default Workers Builds token lacks it |
+
+### Keep migrations backward-compatible
+
+Migrations run before the new code deploys, so for a short time the old Worker
+version runs against the new schema. After every migration, each table and
+column the production code uses must still exist in a shape it can read and
+write. Adding tables, columns and indexes is safe, and so is a table rebuild
+that keeps the same columns (as in `0006_user_fk_cascade.sql`). Dropping or
+renaming a structure the code still uses is a contract step: it ships in a
+later deploy, after the code that stops using that structure is live.
+
+### Branch previews
+
+Workers Builds uploads preview versions of other branches without migrating.
+`wrangler.jsonc` binds `DB` only to production `page-turn`, so previews read
+and write production data, and a branch's unmerged migrations must never be
+applied to it. Test schema changes with `pnpm db:migrate:local` and
+`pnpm test:acceptance`.
 
 ## License
 
